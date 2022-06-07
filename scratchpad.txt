@@ -1,3 +1,38 @@
+TODO:
+    Need to construct a basic level renderer
+        + render other levels like they're stacked (style points)
+        + custom shaders and palette switching??
+    Need a dynamic texture loading process
+        + able to search directories and enumerate textures??
+        + calculates number of textures based on tex-sheet dimensions?
+        + texture "type-ing" system
+            - differentiates back/fore-ground, active/inactive, entity, etc. textures from files?
+            - indexes and notes textures with animation frames??
+    Need a robust editing loop
+        + selection tools??
+            - range select/editing
+            - ctrl-click-esque editing
+            - tile/entity types/id selections
+            - shaped selections???
+                + circle, triangle, rhombus, etc.??
+        + level hot-swapping functionality
+        + quick level creation and deletion
+        + level resizing??
+            - new level -> copy level functionality
+        + level saves and exports?
+            - saves to binary, exports to txt file??
+            - saves and exports to txt file?
+    Defined but flexible level file format(s)
+        + need strict headers and "chunks" and/or delimiters
+        + txt file
+            - easy to "read" but difficult to parse?
+            - convenient to store and maybe manually edit (user)
+        + bin file
+            - easier? to store and parse with defined format
+            - difficult to manually edit and a bit less convenient (user)
+
+
+
 Tile vs. Entity
     If something has any clear-cut, definite state it's
     an entity, else it do be a tile.
@@ -46,11 +81,17 @@ Level Init Config Menu
     - Columns
     - Initial floor textures
     - Confirm
-Edit Menu
+Edit Menu (+ -> Shift Menu)
     - Add New Level
+    - Delete Current Level
+    - Edit/Resize Current Level
     - Switch Active Level
     - Save Level
     - Save Level & Exit
+    + Import level???
+    + Selection tools
+        - range, manual, shape??, row, columns, all, etc.
+    + Shader Palette Switch
 
 
 
