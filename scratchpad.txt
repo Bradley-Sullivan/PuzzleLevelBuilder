@@ -1,0 +1,79 @@
+Tile vs. Entity
+    If something has any clear-cut, definite state it's
+    an entity, else it do be a tile.
+
+Ideal tile types:
+    Full collision tile
+    Player & Enemy Collision tile
+    Enemy Collision tile
+    Full collision moveable tile
+    Status effect tiles
+    Teleportation tiles
+    Player spawn point
+    Entity spawn point
+    Level end point
+
+Ideal entity types:
+    Hostile enemies
+        - long range hitscan
+        - long range projectile
+        - instagib melee
+        - level end blocking enemies?
+    Passive enemies
+        - active obstacles
+        - bandit/thief types
+        - status effect granting types
+    Triggers (recipient looks to trigger src.)
+        - buttons, levers, pressure plates, etc.
+        - trigger channels & channeling system
+    Chests
+        - one item per
+        - if open -> no collision, else full collision
+    "Ammo" pickups
+        - states -> picked up v. not picked up
+    Doors (Triggered and/or Interactable)
+        - states -> open v. closed  >:}
+
+Main Menu
+    - New
+    - Load
+    - Help
+    - Exit
+
+Level Init Config Menu
+    - Level Identifier
+    - Rows
+    - Columns
+    - Initial floor textures
+    - Confirm
+Edit Menu
+    - Add New Level
+    - Switch Active Level
+    - Save Level
+    - Save Level & Exit
+
+
+
+Better Menuing System??
+    - Goals
+        + Ease of intitialization
+        + Ease of drawing
+        + Submenu functionality
+    - Ideas
+        + Separate out different menu "types"
+            - "- %d +", drop-down, checkbox, slider + preview (colors)
+            - Common attributes/functionality
+                + Value held/selection state
+                + Number of selections
+                + Selection identifiers (strings/chars)
+                + Cursor
+        + Support different menu type interoperability
+        + Separate MenuContext struct?
+            - Holds pointers to other menu-types
+                + Menu types can hold pointers to other menu contexts (sub-menus)
+                + Need generalized menu display/processing functions
+        + Use very basic, general menu structs with specialized processing functions
+          within menu contexts.
+            - Differentiate menu types with menu ID
+            
+            
