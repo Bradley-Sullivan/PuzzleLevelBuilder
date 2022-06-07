@@ -10,6 +10,9 @@
 #define EDIT_HEIGHT         GetScreenHeight()
 
 #define MAX_NUM_LEVELS      128
+#define MAX_LEVEL_ROWS      64
+#define MAX_LEVEL_COLS      64
+
 #define MAX_MENU_LEN        64
 #define MAX_LEVEL_ID_LEN    16
 
@@ -69,10 +72,11 @@ typedef struct {
 } Entity;
 
 typedef struct {
-    char** levelID;
+    char* levelID;
 
     int numRows;
     int numCols;
+    int baseFloorTexIndex;
 
     Tile** tiles;
 } Level;
@@ -118,7 +122,7 @@ typedef enum {
 } BuildState;
 
 void initMenu(Menu* m, int numSel, int initCursor, int selFontSize, char sel[][MAX_MENU_LEN], int types[]);
-void initLevel(Level* l, char* id, int r, int c);
+bool initLevel(Level* l, char* id, int texIdx, int r, int c);
 void initTextBox(TextBox* t, int len, int fontSize, int initCursor, double x, double y);
 
 void drawMenu(Menu* m);
@@ -146,6 +150,7 @@ int main(void) {
     char mainMenuSel[4][MAX_MENU_LEN] = {"NEW", "LOAD", "HELP", "EXIT"};
     int mainMenuTypes[4] = {SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU};
     initMenu(&mainMenu, 4, 0, 30, mainMenuSel, mainMenuTypes);
+
     char levelConfMenuSel[5][MAX_MENU_LEN] = {"Level ID", "Rows", "Columns", "Init Floor Tex.", "CONFIRM"};
     int levelConfMenuTypes[5] = {TEXT_ENTRY, PLUS_MINUS_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU, SIMPLE_MENU};
     initTextBox(&levelIDTextBox, MAX_LEVEL_ID_LEN, 20, 0, EDIT_WIDTH - 20 * MAX_LEVEL_ID_LEN, 20);
@@ -164,11 +169,8 @@ int main(void) {
                     state = levelInitConfig(&levelConfMenu, &levelIDTextBox, &levelWorkspace[activeEditLevel]);
                     break;
                 case LOAD_LEVEL:
-                    // loads levels from txt file, and returns num loaded into activeEditLevel
                     break;
                 case EDITING:
-                    // state = editingLoop(&zone);
-                    //renderWorkspace(&zone, 1, 1);
                     break;
                 case SAVE_EXPORT:
                     break;
@@ -199,8 +201,27 @@ void initMenu(Menu *m, int numSel, int initCursor, int selFontSize, char sel[][M
     }
 }
 
-void initLevel(Level* l, char* id, int r, int c) {
+bool initLevel(Level* l, char* id, int texIdx, int r, int c) {
+    if (r <= 0 || c <= 0) {
+        printf("invalid level dimensions\n");
+        return false;
+    } else if (texIdx < 0) {
+        printf("invalid texture index\n");
+        return false;
+    } else {
+       l->levelID = id;
 
+        l->numRows = r;
+        l->numCols = c;
+        l->baseFloorTexIndex = texIdx;
+
+        l->tiles = (Tile**)malloc(sizeof(Tile*) * r);
+        for (int i = 0; i < r; i++) {
+            l->tiles[i] = (Tile*)malloc(sizeof(Tile) * c);
+        }
+    }
+    
+    return true;
 }
 
 void initTextBox(TextBox* t, int len, int fontSize, int initCursor, double x, double y) {
@@ -427,13 +448,9 @@ BuildState mainMenuScreen(Menu *m) {
 
 BuildState levelInitConfig(Menu* m, TextBox* t, Level* l) {
     drawMenu(m);
-    // char levelConfMenuSel[5][MAX_MENU_LEN] = {"Level ID", "Rows", "Columns", "Init Floor Tex.", "CONFIRM"};
+
     switch (m->cursor) {
         case 0:
-            // text entry for level ID
-            // need to handle text box updating
-            // Note: since traverseMenu doesn't handle TEXT_ENTRY, menu doesn't need a text array
-            // and we can draw the text separately as well. separate text from menus into text boxes
             if (!t->editing) {
                 if (traverseMenu(m, SIMPLE_MENU) == KEY_ENTER) {
                     t->editing = true;
@@ -446,17 +463,22 @@ BuildState levelInitConfig(Menu* m, TextBox* t, Level* l) {
             break;
         case 1:
             traverseMenu(m, PLUS_MINUS_MENU);
+            if (m->menuVals[1] > MAX_LEVEL_ROWS) m->menuVals[1] = MAX_LEVEL_ROWS;
             break;
         case 2:
             traverseMenu(m, PLUS_MINUS_MENU);
+            if (m->menuVals[2] > MAX_LEVEL_COLS) m->menuVals[2] = MAX_LEVEL_COLS;
             break;
         case 3:
             traverseMenu(m, PLUS_MINUS_MENU);
             break;
         case 4:
             if (traverseMenu(m, SIMPLE_MENU) == KEY_ENTER) {
-                // init level with values in menu and return EDITING
-                initLevel(l, t->text, m->menuVals[1], m->menuVals[2]);
+                if (initLevel(l, t->text, m->menuVals[3], m->menuVals[1], m->menuVals[2])) {
+                    return EDITING;
+                } else {
+                    return MAIN_MENU;
+                }
             }
             break;
         default:
