@@ -11,7 +11,6 @@
 
 #define MAX_NUM_LEVELS      128
 #define MAX_MENU_LEN        64
-#define MAX_TEXT_ENTRY_LEN  64
 #define MAX_LEVEL_ID_LEN    16
 
 #define SIMPLE_MENU         0
@@ -95,13 +94,14 @@ typedef struct {
     double posX;
     double posY;
 
+    int maxLen;
     int cursor;
     int lastCharIndex;
     int fontSize;
     int width;
     int height;
 
-    char text[MAX_LEVEL_ID_LEN];
+    char* text;
 
     Rectangle background;
     Rectangle editBox;
@@ -119,7 +119,7 @@ typedef enum {
 
 void initMenu(Menu* m, int numSel, int initCursor, int selFontSize, char sel[][MAX_MENU_LEN], int types[]);
 void initLevel(Level* l, char* id, int r, int c);
-void initTextBox(TextBox* t, int fontSize, int initCursor, double x, double y);
+void initTextBox(TextBox* t, int len, int fontSize, int initCursor, double x, double y);
 
 void drawMenu(Menu* m);
 void drawTextBox(TextBox* t, bool active);
@@ -148,7 +148,7 @@ int main(void) {
     initMenu(&mainMenu, 4, 0, 30, mainMenuSel, mainMenuTypes);
     char levelConfMenuSel[5][MAX_MENU_LEN] = {"Level ID", "Rows", "Columns", "Init Floor Tex.", "CONFIRM"};
     int levelConfMenuTypes[5] = {TEXT_ENTRY, PLUS_MINUS_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU, SIMPLE_MENU};
-    initTextBox(&levelIDTextBox, 20, 0, EDIT_WIDTH - 20 * MAX_LEVEL_ID_LEN, 20);
+    initTextBox(&levelIDTextBox, MAX_LEVEL_ID_LEN, 20, 0, EDIT_WIDTH - 20 * MAX_LEVEL_ID_LEN, 20);
     initMenu(&levelConfMenu, 5, 0, 20, levelConfMenuSel, levelConfMenuTypes);
 
     while (!WindowShouldClose() && state != EXIT) {
@@ -203,11 +203,12 @@ void initLevel(Level* l, char* id, int r, int c) {
 
 }
 
-void initTextBox(TextBox* t, int fontSize, int initCursor, double x, double y) {
+void initTextBox(TextBox* t, int len, int fontSize, int initCursor, double x, double y) {
     t->editing = false;
+    t->maxLen = len;
     t->fontSize = fontSize;
     t->cursor = initCursor;
-    t->width = fontSize * MAX_LEVEL_ID_LEN - 5;
+    t->width = fontSize * len - 5;
     t->height = fontSize;
     t->posX = x;
     t->posY = y;
@@ -222,7 +223,8 @@ void initTextBox(TextBox* t, int fontSize, int initCursor, double x, double y) {
     t->editBox.x = x;
     t->editBox.y = y;
 
-    for (int i = 0; i < MAX_LEVEL_ID_LEN; i++) {
+    t->text = (char*)malloc(sizeof(char) * len);
+    for (int i = 0; i < len; i++) {
         t->text[i] = '\0';
     }
 }
@@ -347,7 +349,7 @@ int traverseMenu(Menu* m, int menuType) {
 bool editTextBox(TextBox* t) {
     int key = GetCharPressed();
 
-    if (t->cursor < MAX_LEVEL_ID_LEN - 1 && key != 0) {
+    if (t->cursor < t->maxLen - 1 && key != 0) {
         t->text[t->cursor] = key;
         t->cursor += 1;
     }
@@ -357,13 +359,13 @@ bool editTextBox(TextBox* t) {
     switch (key) {
         case KEY_BACKSPACE:
             if (t->cursor > 0) {
-                for (int i = t->cursor; i < MAX_LEVEL_ID_LEN; i++) t->text[i - 1] = t->text[i];
+                for (int i = t->cursor; i < t->maxLen; i++) t->text[i - 1] = t->text[i];
                 t->cursor -= 1;
             }
             break;
         case KEY_DELETE:
-            if (t->cursor < MAX_LEVEL_ID_LEN - 1) {
-                for (int i = t->cursor; i < MAX_LEVEL_ID_LEN; i++) t->text[i] = t->text[i + 1];
+            if (t->cursor < t->maxLen - 1) {
+                for (int i = t->cursor; i < t->maxLen; i++) t->text[i] = t->text[i + 1];
             }
             break;
         case KEY_LEFT:
@@ -372,7 +374,7 @@ bool editTextBox(TextBox* t) {
             }
             break;
         case KEY_RIGHT:
-            if (t->cursor < MAX_LEVEL_ID_LEN - 1) {
+            if (t->cursor < t->maxLen - 1) {
                 t->cursor += 1;
             }
             break;
@@ -380,7 +382,7 @@ bool editTextBox(TextBox* t) {
             t->cursor = 0;
             break;
         case KEY_END:
-            t->cursor = MAX_LEVEL_ID_LEN - 1;
+            t->cursor = t->maxLen - 1;
             break;
         case KEY_ENTER:
             t->editing = false;
