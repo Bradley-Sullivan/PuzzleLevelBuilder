@@ -4,14 +4,15 @@
 #include <stdbool.h>
 #include "include/raylib.h"
 
-#define WINDOW_WIDTH        1920
-#define WINDOW_HEIGHT       1080
-#define EDIT_WIDTH          1680
-#define EDIT_HEIGHT         1080
+#define WINDOW_WIDTH        GetScreenWidth()
+#define WINDOW_HEIGHT       GetScreenHeight()
+#define EDIT_WIDTH          (WINDOW_WIDTH * 0.8)
+#define EDIT_HEIGHT         GetScreenHeight()
 
 #define MAX_NUM_LEVELS      128
 #define MAX_MENU_LEN        64
 #define MAX_TEXT_ENTRY_LEN  64
+#define MAX_LEVEL_ID_LEN    16
 
 #define SIMPLE_MENU         0
 #define PLUS_MINUS_MENU     1
@@ -89,6 +90,8 @@ typedef struct {
 } Menu;
 
 typedef struct {
+    bool editing;
+
     double posX;
     double posY;
 
@@ -98,7 +101,7 @@ typedef struct {
     int width;
     int height;
 
-    char text[MAX_TEXT_ENTRY_LEN];
+    char text[MAX_LEVEL_ID_LEN];
 
     Rectangle background;
     Rectangle editBox;
@@ -116,10 +119,10 @@ typedef enum {
 
 void initMenu(Menu* m, int numSel, int initCursor, int selFontSize, char sel[][MAX_MENU_LEN], int types[]);
 void initLevel(Level* l, char* id, int r, int c);
-void initTextBox(TextBox* t, int fontSize, int initCursor, int w, int h, double x, double y);
+void initTextBox(TextBox* t, int fontSize, int initCursor, double x, double y);
 
 void drawMenu(Menu* m);
-void drawTextBox(TextBox* t);
+void drawTextBox(TextBox* t, bool active);
 
 int traverseMenu(Menu* m, int menuType);
 bool editTextBox(TextBox* t);
@@ -145,7 +148,7 @@ int main(void) {
     initMenu(&mainMenu, 4, 0, 30, mainMenuSel, mainMenuTypes);
     char levelConfMenuSel[5][MAX_MENU_LEN] = {"Level ID", "Rows", "Columns", "Init Floor Tex.", "CONFIRM"};
     int levelConfMenuTypes[5] = {TEXT_ENTRY, PLUS_MINUS_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU, SIMPLE_MENU};
-    initTextBox(&levelIDTextBox, 20, 0, 100, 20, EDIT_WIDTH - 105, 20);
+    initTextBox(&levelIDTextBox, 20, 0, EDIT_WIDTH - 20 * MAX_LEVEL_ID_LEN, 20);
     initMenu(&levelConfMenu, 5, 0, 20, levelConfMenuSel, levelConfMenuTypes);
 
     while (!WindowShouldClose() && state != EXIT) {
@@ -200,23 +203,28 @@ void initLevel(Level* l, char* id, int r, int c) {
 
 }
 
-void initTextBox(TextBox* t, int fontSize, int initCursor, int w, int h, double x, double y) {
+void initTextBox(TextBox* t, int fontSize, int initCursor, double x, double y) {
+    t->editing = false;
     t->fontSize = fontSize;
     t->cursor = initCursor;
-    t->width = w;
-    t->height = h;
+    t->width = fontSize * MAX_LEVEL_ID_LEN - 5;
+    t->height = fontSize;
     t->posX = x;
     t->posY = y;
 
-    t->background.height = h + 5;
-    t->background.width = w + 5;
+    t->background.height = t->height + 5;
+    t->background.width = t->width + 5;
     t->background.x = x - 2.5;
     t->background.y = y - 2.5;
 
-    t->editBox.height = h;
-    t->editBox.width = w;
+    t->editBox.height = t->height;
+    t->editBox.width = t->width ;
     t->editBox.x = x;
     t->editBox.y = y;
+
+    for (int i = 0; i < MAX_LEVEL_ID_LEN; i++) {
+        t->text[i] = '\0';
+    }
 }
 
 void drawMenu(Menu* m) {
@@ -231,7 +239,7 @@ void drawMenu(Menu* m) {
                 char buf[8];
                 sprintf(buf, "- %d +", m->menuVals[i]);
                 DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
-                DrawText(buf, begOffset + 5 + MeasureText(buf, m->selFS), yOffset, m->selFS, RAYWHITE);
+                DrawText(buf, begOffset + 10 + MeasureText(m->sel[i], m->selFS), yOffset, m->selFS, RAYWHITE);
                 break;
             case CHECKLIST_MENU:
                 DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
@@ -250,11 +258,18 @@ void drawMenu(Menu* m) {
     DrawText(">", EDIT_WIDTH + m->selFS, m->selFS + (m->cursor * m->selFS), m->selFS, RAYWHITE);
 }
 
-void drawTextBox(TextBox* t) {
-    DrawRectangleRec(t->background, RAYWHITE);
-    DrawRectangleRec(t->editBox, BLACK);
-    DrawText(t->text, t->posX, t->posY, t->fontSize, RAYWHITE);
-    DrawRectangle(t->posX + (t->cursor * t->fontSize), t->posY + t->height, t->fontSize, 3, RAYWHITE);
+void drawTextBox(TextBox* t, bool active) {
+    if (active) {
+        DrawRectangleRec(t->background, RAYWHITE);
+        DrawRectangleRec(t->editBox, BLACK);
+        DrawText(t->text, t->posX + 1, t->posY, t->fontSize, RAYWHITE);
+        DrawRectangle(t->posX + MeasureText(TextSubtext(t->text, 0, t->cursor), t->fontSize), t->posY + t->height - 2, t->fontSize - 5, 2, RAYWHITE); 
+    } else {
+        DrawRectangleRec(t->background, (Color){245, 245, 245, 150});
+        DrawRectangleRec(t->editBox, (Color){10, 10, 10, 150});
+        DrawText(t->text, t->posX + 1, t->posY, t->fontSize, (Color){245, 245, 245, 150});
+    }
+    
 }
 
 int traverseMenu(Menu* m, int menuType) {
@@ -273,6 +288,9 @@ int traverseMenu(Menu* m, int menuType) {
                     break;
                 case KEY_ENTER:
                     retVal = KEY_ENTER;
+                    break;
+                case KEY_SPACE:
+                    retVal = KEY_SPACE;
                     break;
                 default:
                     break;
@@ -318,6 +336,7 @@ int traverseMenu(Menu* m, int menuType) {
                 default:
                     break;
             }
+            break;
         default:
             break;
     }
@@ -326,16 +345,25 @@ int traverseMenu(Menu* m, int menuType) {
 }
 
 bool editTextBox(TextBox* t) {
-    int key = GetKeyPressed();
+    int key = GetCharPressed();
+
+    if (t->cursor < MAX_LEVEL_ID_LEN - 1 && key != 0) {
+        t->text[t->cursor] = key;
+        t->cursor += 1;
+    }
+
+    key = GetKeyPressed();
+
     switch (key) {
         case KEY_BACKSPACE:
             if (t->cursor > 0) {
-                for (int i = t->cursor; i < MAX_TEXT_ENTRY_LEN; i++) t->text[i - 1] = t->text[i];
+                for (int i = t->cursor; i < MAX_LEVEL_ID_LEN; i++) t->text[i - 1] = t->text[i];
+                t->cursor -= 1;
             }
             break;
         case KEY_DELETE:
-            if (t->cursor < MAX_TEXT_ENTRY_LEN - 1) {
-                for (int i = t->cursor + 1; i < MAX_TEXT_ENTRY_LEN; i++) t->text[i] = t->text[i + 1];
+            if (t->cursor < MAX_LEVEL_ID_LEN - 1) {
+                for (int i = t->cursor; i < MAX_LEVEL_ID_LEN; i++) t->text[i] = t->text[i + 1];
             }
             break;
         case KEY_LEFT:
@@ -344,7 +372,7 @@ bool editTextBox(TextBox* t) {
             }
             break;
         case KEY_RIGHT:
-            if (t->cursor < MAX_TEXT_ENTRY_LEN - 1) {
+            if (t->cursor < MAX_LEVEL_ID_LEN - 1) {
                 t->cursor += 1;
             }
             break;
@@ -352,38 +380,39 @@ bool editTextBox(TextBox* t) {
             t->cursor = 0;
             break;
         case KEY_END:
-            t->cursor = MAX_TEXT_ENTRY_LEN - 1;
+            t->cursor = MAX_LEVEL_ID_LEN - 1;
             break;
+        case KEY_ENTER:
+            t->editing = false;
+            return false;
         default:
-            if (key >= 39 && key <= 96) {
-                t->text[t->cursor] = key;
-            } else if (key == KEY_ENTER) {
-                return true;
-            }
             break;
     }
 
-    return false;
+    return true;
 }
 
 BuildState mainMenuScreen(Menu *m) {
     drawMenu(m);
 
-    switch (GetKeyPressed()) {
-        case KEY_DOWN:
-            m->cursor = (m->cursor + 1) % m->numSel;
+    switch (m->cursor) {
+        case 0:
+            if (traverseMenu(m, SIMPLE_MENU) == KEY_ENTER) {
+                return NEW_LEVEL;
+            }
             break;
-        case KEY_UP:
-            m->cursor = (m->cursor == 0) ? m->numSel - 1 : m->cursor - 1;
-            break;
-        case KEY_ENTER:
-            if (m->cursor == 0) {
-                return LEVEL_SIZING;
-            } else if (m->cursor == 1) {
+        case 1:
+            if (traverseMenu(m, SIMPLE_MENU) == KEY_ENTER) {
                 return LOAD_LEVEL;
-            } else if (m->cursor == 2) {
+            }
+            break;
+        case 2:
+            if (traverseMenu(m, SIMPLE_MENU) == KEY_ENTER) {
                 return HELP;
-            } else if (m->cursor == 3) {
+            }
+            break;
+        case 3:
+            if (traverseMenu(m, SIMPLE_MENU) == KEY_ENTER) {
                 return EXIT;
             }
             break;
@@ -403,9 +432,15 @@ BuildState levelInitConfig(Menu* m, TextBox* t, Level* l) {
             // need to handle text box updating
             // Note: since traverseMenu doesn't handle TEXT_ENTRY, menu doesn't need a text array
             // and we can draw the text separately as well. separate text from menus into text boxes
-            traverseMenu(m, SIMPLE_MENU);
-            editTextBox(t);
-            drawTextBox(t);
+            if (!t->editing) {
+                if (traverseMenu(m, SIMPLE_MENU) == KEY_ENTER) {
+                    t->editing = true;
+                }
+                drawTextBox(t, false);
+            } else {
+                editTextBox(t);
+                drawTextBox(t, true);
+            }
             break;
         case 1:
             traverseMenu(m, PLUS_MINUS_MENU);
