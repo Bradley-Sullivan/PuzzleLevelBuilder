@@ -82,6 +82,15 @@ typedef struct {
 } Level;
 
 typedef struct {
+    Level levels[MAX_NUM_LEVELS];
+
+    int activeEditLevel;
+
+    // There's more to this struct, but I'm not sure how to handle it yet.
+
+} Workspace;
+
+typedef struct {
     int cursor;
     int numSel;
     int selFS;
@@ -127,7 +136,6 @@ void initTextBox(TextBox* t, int len, int fontSize, int initCursor, double x, do
 
 void drawMenu(Menu* m);
 void drawTextBox(TextBox* t, bool active);
-
 int traverseMenu(Menu* m, int menuType);
 bool editTextBox(TextBox* t);
 
