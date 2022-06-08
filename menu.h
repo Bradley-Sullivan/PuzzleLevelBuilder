@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include "include/raylib.h"
-#include "drawParam.h"
+#include "param.h"
 
 #define MAX_MENU_LEN        64
 #define MAX_LEVEL_ID_LEN    16
@@ -23,7 +23,7 @@
 #define CHECKLIST_MENU      2
 #define TEXT_ENTRY          3
 
-typedef struct {
+typedef struct Menu {
     int cursor;
     int numSel;
     int selFS;
@@ -34,7 +34,7 @@ typedef struct {
     char** sel;
 } Menu;
 
-typedef struct {
+typedef struct TextBox {
     bool editing;
 
     double posX;
