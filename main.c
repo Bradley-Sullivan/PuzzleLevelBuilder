@@ -13,14 +13,21 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 #include "include/raylib.h"
 #include "menu.h"
 #include "drawParam.h"
 
-#define MAX_NUM_LEVELS      128
-#define MAX_LEVEL_ROWS      64
-#define MAX_LEVEL_COLS      64
+#define MAX_NUM_LEVELS     128
+#define MAX_LEVEL_ROWS     64
+#define MAX_LEVEL_COLS     64
 
+#define TILE_DIRECTORY     "/home/brsul/Nextcloud/Programs/C/Games/PuzzleLevelBuilder/assets/Tile"
+#define ENTITY_DIRECTORY   "/home/brsul/Nextcloud/Programs/C/Games/PuzzleLevelBuilder/assets/Entity"
+#define OTHER_DIRECTORY     "/home/brsul/Nextcloud/Programs/C/Games/PuzzleLevelBuilder/assets/Other"
+
+#define MAX_NUM_TEX        128
+#define MAX_FILENAME_LEN   64
 
 typedef struct {
     char tileID;
@@ -85,8 +92,14 @@ typedef struct {
     Level levels[MAX_NUM_LEVELS];
 
     int activeEditLevel;
+    int numTileTex;
+    int numEntityTex;
+    int numOtherTex;
 
     // There's more to this struct, but I'm not sure how to handle it yet.
+    Texture2D* tileTex;
+    Texture2D* entityTex;
+    Texture2D* otherTex;
 
 } Workspace;
 
@@ -101,18 +114,20 @@ typedef enum {
 } BuildState;
 
 bool initLevel(Level* l, char* id, int texIdx, int r, int c);
+bool loadTextures(Workspace* w);
+int loadTexHelper(Texture2D* dest, char* dir);
 
 BuildState mainMenuScreen(Menu* m);
 BuildState levelInitConfig(Menu* m, TextBox* t, Level* l);
 BuildState editingLoop();
 
 int main(void) {
+    Workspace editWorkspace;
     BuildState state = MAIN_MENU;
     Menu mainMenu, levelConfMenu;
     TextBox levelIDTextBox;
-    Level levelWorkspace[MAX_NUM_LEVELS];
 
-    int activeEditLevel = -1;
+    editWorkspace.activeEditLevel = -1;
 
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "test");
     ToggleFullscreen();
@@ -136,12 +151,13 @@ int main(void) {
                     state = mainMenuScreen(&mainMenu);
                     break;
                 case NEW_LEVEL:
-                    activeEditLevel++;
-                    state = levelInitConfig(&levelConfMenu, &levelIDTextBox, &levelWorkspace[activeEditLevel]);
+                    editWorkspace.activeEditLevel++;
+                    state = levelInitConfig(&levelConfMenu, &levelIDTextBox, &editWorkspace.levels[editWorkspace.activeEditLevel]);
                     break;
                 case LOAD_LEVEL:
                     break;
                 case EDITING:
+                    state = EXIT;
                     break;
                 case SAVE_EXPORT:
                     break;
@@ -153,6 +169,7 @@ int main(void) {
             }
         EndDrawing();
     }
+    loadTextures(&editWorkspace);
     return 0;
 }
 
@@ -164,7 +181,11 @@ bool initLevel(Level* l, char* id, int texIdx, int r, int c) {
         printf("invalid texture index\n");
         return false;
     } else {
-       l->levelID = id;
+
+        l->levelID = (char*)malloc(sizeof(char) * MAX_LEVEL_ID_LEN);
+        for (int i = 0; i < MAX_LEVEL_ID_LEN; i++) {
+            l->levelID[i] = id[i];
+        }
 
         l->numRows = r;
         l->numCols = c;
@@ -177,6 +198,41 @@ bool initLevel(Level* l, char* id, int texIdx, int r, int c) {
     }
     
     return true;
+}
+
+bool loadTextures(Workspace* w) {
+    w->numTileTex = loadTexHelper(w->tileTex, TILE_DIRECTORY);
+    w->numEntityTex = loadTexHelper(w->entityTex, ENTITY_DIRECTORY);
+    w->numOtherTex = loadTexHelper(w->otherTex, OTHER_DIRECTORY);
+    printf("%d tile textures loaded\n", w->numTileTex);
+    printf("%d entity textures loaded\n", w->numEntityTex);
+    printf("%d other textures loaded\n", w->numOtherTex);
+
+    return true;
+}
+
+int loadTexHelper(Texture2D* dest, char* dir) {
+    char** texNames;
+    int numTex, curTex = 0;
+
+    texNames = (char**)malloc(sizeof(char*) * MAX_NUM_TEX);
+    for (int i = 0; i < MAX_NUM_TEX; i++) {
+        texNames[i] = (char*)malloc(sizeof(char) * MAX_FILENAME_LEN);
+    }
+
+    texNames = LoadDirectoryFiles(dir, &numTex);
+    dest = (Texture2D*)malloc(sizeof(Texture2D) * numTex);
+    ChangeDirectory(dir);
+
+    for (int i = 0; i < numTex; i++) {
+        if (IsFileExtension(texNames[i], ".png")) {
+            printf("loading texture %s\n", texNames[i]);
+            dest[curTex] = LoadTexture(texNames[i]);
+            curTex++;
+        }
+    }
+
+    return curTex;
 }
 
 BuildState mainMenuScreen(Menu *m) {
