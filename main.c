@@ -16,20 +16,9 @@
 #include <string.h>
 #include "include/raylib.h"
 #include "menu.h"
-#include "drawParam.h"
+#include "param.h"
 
-#define MAX_NUM_LEVELS     128
-#define MAX_LEVEL_ROWS     64
-#define MAX_LEVEL_COLS     64
-
-#define TILE_DIRECTORY     "/home/brsul/Nextcloud/Programs/C/Games/PuzzleLevelBuilder/assets/Tile"
-#define ENTITY_DIRECTORY   "/home/brsul/Nextcloud/Programs/C/Games/PuzzleLevelBuilder/assets/Entity"
-#define OTHER_DIRECTORY     "/home/brsul/Nextcloud/Programs/C/Games/PuzzleLevelBuilder/assets/Other"
-
-#define MAX_NUM_TEX        128
-#define MAX_FILENAME_LEN   64
-
-typedef struct {
+typedef struct Tile {
     char tileID;
 
     bool playerColl;        // has player collision
@@ -47,9 +36,11 @@ typedef struct {
     int col;                // tile's column-position in level grid
     int teleChannel;        // teleporter channel
     
+    int attr[13];           // tile's attributes
+
 } Tile;
 
-typedef struct {
+typedef struct Entity {
     char entityID;              // entity identifier used for quickly handling entity-related events?
 
     bool isHostile;             // enemy/entity which does directly harm
@@ -78,7 +69,7 @@ typedef struct {
 
 } Entity;
 
-typedef struct {
+typedef struct Level {
     char* levelID;
 
     int numRows;
@@ -88,22 +79,29 @@ typedef struct {
     Tile** tiles;
 } Level;
 
-typedef struct {
+typedef struct Workspace {
     Level levels[MAX_NUM_LEVELS];
 
     int activeEditLevel;
+    int nextNewLevel;
+
     int numTileTex;
     int numEntityTex;
     int numOtherTex;
+
+    int cursorRow;
+    int cursorCol;
 
     // There's more to this struct, but I'm not sure how to handle it yet.
     Texture2D* tileTex;
     Texture2D* entityTex;
     Texture2D* otherTex;
 
+    Texture2D cursorTex;
+
 } Workspace;
 
-typedef enum {
+typedef enum BuildState {
     MAIN_MENU,
     NEW_LEVEL,
     LOAD_LEVEL,
@@ -114,24 +112,31 @@ typedef enum {
 } BuildState;
 
 bool initLevel(Level* l, char* id, int texIdx, int r, int c);
+void previewTextures(Workspace* w, int tex);
 bool loadTextures(Workspace* w);
-int loadTexHelper(Texture2D* dest, char* dir);
+int loadTexHelper(Texture2D dest[], char* dir);
+
+void renderWorkspace(Workspace* w);
+void drawTileAttr(Tile t, double x, double y);
 
 BuildState mainMenuScreen(Menu* m);
-BuildState levelInitConfig(Menu* m, TextBox* t, Level* l);
-BuildState editingLoop();
+BuildState levelInitConfig(Menu* m, TextBox* t, Workspace* w);
+BuildState editingLoop(Workspace* w);
 
 int main(void) {
     Workspace editWorkspace;
     BuildState state = MAIN_MENU;
-    Menu mainMenu, levelConfMenu;
+    Menu mainMenu, levelConfMenu, editSideMenu, editContextMenu;
     TextBox levelIDTextBox;
 
-    editWorkspace.activeEditLevel = -1;
+    editWorkspace.activeEditLevel = 0;
+    editWorkspace.nextNewLevel = 0;
 
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "test");
     ToggleFullscreen();
     SetTargetFPS(60);
+
+    loadTextures(&editWorkspace);
 
     char mainMenuSel[4][MAX_MENU_LEN] = {"NEW", "LOAD", "HELP", "EXIT"};
     int mainMenuTypes[4] = {SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU};
@@ -151,13 +156,12 @@ int main(void) {
                     state = mainMenuScreen(&mainMenu);
                     break;
                 case NEW_LEVEL:
-                    editWorkspace.activeEditLevel++;
-                    state = levelInitConfig(&levelConfMenu, &levelIDTextBox, &editWorkspace.levels[editWorkspace.activeEditLevel]);
+                    state = levelInitConfig(&levelConfMenu, &levelIDTextBox, &editWorkspace);
                     break;
                 case LOAD_LEVEL:
                     break;
                 case EDITING:
-                    state = EXIT;
+                    state = editingLoop(&editWorkspace);
                     break;
                 case SAVE_EXPORT:
                     break;
@@ -169,7 +173,6 @@ int main(void) {
             }
         EndDrawing();
     }
-    loadTextures(&editWorkspace);
     return 0;
 }
 
@@ -181,11 +184,8 @@ bool initLevel(Level* l, char* id, int texIdx, int r, int c) {
         printf("invalid texture index\n");
         return false;
     } else {
-
         l->levelID = (char*)malloc(sizeof(char) * MAX_LEVEL_ID_LEN);
-        for (int i = 0; i < MAX_LEVEL_ID_LEN; i++) {
-            l->levelID[i] = id[i];
-        }
+        for (int i = 0; i < MAX_LEVEL_ID_LEN; i++) l->levelID[i] = id[i];
 
         l->numRows = r;
         l->numCols = c;
@@ -195,15 +195,51 @@ bool initLevel(Level* l, char* id, int texIdx, int r, int c) {
         for (int i = 0; i < r; i++) {
             l->tiles[i] = (Tile*)malloc(sizeof(Tile) * c);
         }
+
+        for (int i = 0; i < r; i++) {
+            for (int j = 0; j < c; j++) {
+                l->tiles[i][j].texIndex = texIdx;
+                l->tiles[i][j].row = i;
+                l->tiles[i][j].col = j;
+            }
+        }
+
+        printf("Initialized Level: %s\n", l->levelID);
+        printf("\tRows: %d\n", l->numRows);
+        printf("\tColumns: %d\n", l->numCols);
+        printf("\tBase Floor Tex Index: %d\n", l->baseFloorTexIndex);
+
     }
     
     return true;
 }
 
+void previewTextures(Workspace* w, int tex) {
+    int xOffset, yOffset;
+    
+    DrawRectangle((TILE_PIX_WIDTH + 20) * (tex + 1) - 5, (TILE_PIX_HEIGHT + 10) * ((tex + 5) / 5) - 5, TILE_PIX_WIDTH + 10, TILE_PIX_HEIGHT + 10, RED);
+
+    for (int i = 0; i < w->numTileTex; i++) {
+        xOffset = (TILE_PIX_WIDTH + 20) * (i + 1);
+        yOffset = (TILE_PIX_HEIGHT + 10) * ((i + 5) / 5);
+        DrawTexture(w->tileTex[i], xOffset, yOffset, WHITE);
+    }
+}
+
 bool loadTextures(Workspace* w) {
+    w->cursorRow = 0;
+    w->cursorCol = 0;
+
+    w->tileTex = (Texture2D*)malloc(sizeof(Texture2D) * MAX_NUM_TEX);
+    w->entityTex = (Texture2D*)malloc(sizeof(Texture2D) * MAX_NUM_TEX);
+    w->otherTex = (Texture2D*)malloc(sizeof(Texture2D) * MAX_NUM_TEX);
+
     w->numTileTex = loadTexHelper(w->tileTex, TILE_DIRECTORY);
     w->numEntityTex = loadTexHelper(w->entityTex, ENTITY_DIRECTORY);
     w->numOtherTex = loadTexHelper(w->otherTex, OTHER_DIRECTORY);
+
+    w->cursorTex = LoadTexture(CURSOR_FILEPATH);
+
     printf("%d tile textures loaded\n", w->numTileTex);
     printf("%d entity textures loaded\n", w->numEntityTex);
     printf("%d other textures loaded\n", w->numOtherTex);
@@ -211,7 +247,7 @@ bool loadTextures(Workspace* w) {
     return true;
 }
 
-int loadTexHelper(Texture2D* dest, char* dir) {
+int loadTexHelper(Texture2D dest[], char* dir) {
     char** texNames;
     int numTex, curTex = 0;
 
@@ -221,7 +257,6 @@ int loadTexHelper(Texture2D* dest, char* dir) {
     }
 
     texNames = LoadDirectoryFiles(dir, &numTex);
-    dest = (Texture2D*)malloc(sizeof(Texture2D) * numTex);
     ChangeDirectory(dir);
 
     for (int i = 0; i < numTex; i++) {
@@ -233,6 +268,31 @@ int loadTexHelper(Texture2D* dest, char* dir) {
     }
 
     return curTex;
+}
+
+void renderWorkspace(Workspace* w) {
+    int rows = w->levels[w->activeEditLevel].numRows;
+    int cols = w->levels[w->activeEditLevel].numCols;
+    int xOffset, yOffset;
+    double curX = (EDIT_WIDTH / 2) - (TILE_PIX_WIDTH / 2);
+    double curY = (EDIT_HEIGHT / 2) - (TILE_PIX_HEIGHT / 2);
+
+    for (int i = 0; i < rows; i++) {
+        for (int k = 0; k < cols; k++) {
+            xOffset = (EDIT_WIDTH / 2) - ((w->cursorCol - k) * TILE_PIX_WIDTH) - (TILE_PIX_WIDTH / 2);
+            yOffset = (EDIT_HEIGHT / 2) - ((w->cursorRow - i) * TILE_PIX_HEIGHT) - (TILE_PIX_HEIGHT / 2);
+            int tex = w->levels[w->activeEditLevel].tiles[i][k].texIndex;
+            if (xOffset < EDIT_WIDTH - (TILE_PIX_WIDTH / 2)) {
+                DrawTexture(w->tileTex[tex], xOffset, yOffset, WHITE);
+            }
+        }
+    }
+
+    DrawTexture(w->cursorTex, curX, curY, WHITE);
+}
+
+void drawTileAttr(Tile t, double x, double y) {
+
 }
 
 BuildState mainMenuScreen(Menu *m) {
@@ -266,8 +326,10 @@ BuildState mainMenuScreen(Menu *m) {
     return MAIN_MENU;
 }
 
-BuildState levelInitConfig(Menu* m, TextBox* t, Level* l) {
+BuildState levelInitConfig(Menu* m, TextBox* t, Workspace *w) {
     drawMenu(m);
+
+    previewTextures(w, m->menuVals[3]);
 
     switch (m->cursor) {
         case 0:
@@ -291,10 +353,18 @@ BuildState levelInitConfig(Menu* m, TextBox* t, Level* l) {
             break;
         case 3:
             traverseMenu(m, PLUS_MINUS_MENU);
+            if (m->menuVals[3] < 0) m->menuVals[3] = 0;
+            if (m->menuVals[3] >= w->numTileTex) m->menuVals[3] = w->numTileTex - 1;
             break;
         case 4:
             if (traverseMenu(m, SIMPLE_MENU) == KEY_ENTER) {
-                if (initLevel(l, t->text, m->menuVals[3], m->menuVals[1], m->menuVals[2])) {
+                if (initLevel(&w->levels[w->nextNewLevel], t->text, m->menuVals[3], m->menuVals[1], m->menuVals[2])) {
+                    printf("Successfully initialized level\n");
+                    printf("\tLevel ID: %s\n", w->levels[w->nextNewLevel].levelID);
+                    printf("\tLevel Rows: %d\n", w->levels[w->nextNewLevel].numRows);
+                    printf("\tLevel Cols: %d\n", w->levels[w->nextNewLevel].numCols);
+                    printf("\tLevel Tile Texture: %d\n", w->levels[w->nextNewLevel].baseFloorTexIndex);
+                    w->nextNewLevel++;
                     return EDITING;
                 } else {
                     return MAIN_MENU;
@@ -306,5 +376,33 @@ BuildState levelInitConfig(Menu* m, TextBox* t, Level* l) {
     }
 
     return NEW_LEVEL;
+}
+
+BuildState editingLoop(Workspace* w) {
+    renderWorkspace(w);
+
+    if (IsKeyPressed(KEY_RIGHT)) {
+        w->cursorCol++;
+        if (w->cursorCol >= w->levels[w->activeEditLevel].numCols) {
+            w->cursorCol = 0;
+        }
+    } else if (IsKeyPressed(KEY_LEFT)) {
+        w->cursorCol--;
+        if (w->cursorCol < 0) {
+            w->cursorCol = w->levels[w->activeEditLevel].numCols - 1;
+        }
+    } else if (IsKeyPressed(KEY_UP)) {
+        w->cursorRow--;
+        if (w->cursorRow < 0) {
+            w->cursorRow = w->levels[w->activeEditLevel].numRows - 1;
+        }
+    } else if (IsKeyPressed(KEY_DOWN)) {
+        w->cursorRow++;
+        if (w->cursorRow >= w->levels[w->activeEditLevel].numRows) {
+            w->cursorRow = 0;
+        }
+    }
+
+    return EDITING;
 }
 
