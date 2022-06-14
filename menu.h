@@ -16,23 +16,13 @@
 #include "param.h"
 
 #define MAX_MENU_LEN        64
+#define MAX_TEXT_ENTRY_LEN  64
 #define MAX_LEVEL_ID_LEN    16
 
 #define SIMPLE_MENU         0
 #define PLUS_MINUS_MENU     1
 #define CHECKLIST_MENU      2
 #define TEXT_ENTRY          3
-
-typedef struct Menu {
-    int cursor;
-    int numSel;
-    int selFS;
-
-    int* menuTypes;
-    int* menuVals;
-
-    char** sel;
-} Menu;
 
 typedef struct TextBox {
     bool editing;
@@ -41,6 +31,7 @@ typedef struct TextBox {
     double posY;
 
     int maxLen;
+    int maxDispWidth;
     int cursor;
     int lastCharIndex;
     int fontSize;
@@ -53,8 +44,21 @@ typedef struct TextBox {
     Rectangle editBox;
 } TextBox;
 
+typedef struct Menu {
+    int cursor;
+    int numSel;
+    int selFS;
+
+    int* menuTypes;
+    int* menuVals;
+
+    char** sel;
+
+    TextBox* tBox;
+} Menu;
+
 void initMenu(Menu* m, int numSel, int initCursor, int selFontSize, char sel[][MAX_MENU_LEN], int types[]);
-void initTextBox(TextBox* t, int len, int fontSize, int initCursor, double x, double y);
+void initTextBox(TextBox* t, int editDisplayWidth, int fontSize, int initCursor, double x, double y);
 
 void drawMenu(Menu* m);
 void drawTextBox(TextBox* t, bool active);

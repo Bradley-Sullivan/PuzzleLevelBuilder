@@ -1,6 +1,8 @@
 #include "menu.h"
 
 void initMenu(Menu *m, int numSel, int initCursor, int selFontSize, char sel[][MAX_MENU_LEN], int types[]) {
+    int numTextEntry = 0;
+
     m->cursor = initCursor;
     m->numSel = numSel;
     m->selFS = selFontSize;
@@ -9,19 +11,32 @@ void initMenu(Menu *m, int numSel, int initCursor, int selFontSize, char sel[][M
     m->menuVals = (int*)malloc(sizeof(int) * numSel);
     m->sel = (char**)malloc(sizeof(char*) * numSel);
     for (int i = 0; i < numSel; i++) {
+        if (types[i] == TEXT_ENTRY) {
+            numTextEntry++;
+        }
         m->sel[i] = (char*)malloc(sizeof(char) * MAX_MENU_LEN);
         m->sel[i] = sel[i];
         m->menuTypes[i] = types[i];
         m->menuVals[i] = 0;
     }
+
+    if (numTextEntry > 0) {
+        m->tBox = (TextBox*)malloc(sizeof(TextBox) * numSel);
+        for (int i = 0; i < numSel; i++) {
+            if (m->menuTypes[i] == TEXT_ENTRY) {
+                initTextBox(&m->tBox[i], 10, m->selFS, 0, EDIT_WIDTH - (m->selFS * 11), ((i + 1) * m->selFS));
+            }
+        }
+    }
 }
 
-void initTextBox(TextBox* t, int len, int fontSize, int initCursor, double x, double y) {
+void initTextBox(TextBox* t, int editDisplayWidth, int fontSize, int initCursor, double x, double y) {
     t->editing = false;
-    t->maxLen = len;
+    t->maxLen = MAX_TEXT_ENTRY_LEN;
+    t->maxDispWidth = editDisplayWidth;
     t->fontSize = fontSize;
     t->cursor = initCursor;
-    t->width = fontSize * len - 5;
+    t->width = MeasureText("X", fontSize) * (editDisplayWidth + 1);
     t->height = fontSize;
     t->posX = x;
     t->posY = y;
@@ -36,8 +51,8 @@ void initTextBox(TextBox* t, int len, int fontSize, int initCursor, double x, do
     t->editBox.x = x;
     t->editBox.y = y;
 
-    t->text = (char*)malloc(sizeof(char) * len);
-    for (int i = 0; i < len; i++) {
+    t->text = (char*)malloc(sizeof(char) * MAX_TEXT_ENTRY_LEN);
+    for (int i = 0; i < MAX_TEXT_ENTRY_LEN; i++) {
         t->text[i] = '\0';
     }
 }
@@ -46,14 +61,13 @@ void drawMenu(Menu* m) {
     int begOffset = EDIT_WIDTH + 2 * m->selFS;
     for (int i = 0; i < m->numSel; i++) {
         int yOffset = m->selFS + (i * m->selFS);
+        DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
         switch (m->menuTypes[i]) {
             case SIMPLE_MENU:
-                DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
                 break;
             case PLUS_MINUS_MENU:
                 char buf[8];
                 sprintf(buf, "- %d +", m->menuVals[i]);
-                DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
                 DrawText(buf, begOffset + 10 + MeasureText(m->sel[i], m->selFS), yOffset, m->selFS, RAYWHITE);
                 break;
             case CHECKLIST_MENU:
@@ -64,8 +78,10 @@ void drawMenu(Menu* m) {
                     DrawText("[ ]", begOffset + 5 + MeasureText(m->sel[i], m->selFS), yOffset, m->selFS, RAYWHITE);
                 }
                 break;
+            case TEXT_ENTRY:
+                drawTextBox(&m->tBox[i], m->tBox[i].editing);
+                break;
             default:
-                DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
                 break;
         }
     }
@@ -77,14 +93,18 @@ void drawTextBox(TextBox* t, bool active) {
     if (active) {
         DrawRectangleRec(t->background, RAYWHITE);
         DrawRectangleRec(t->editBox, BLACK);
-        DrawText(t->text, t->posX + 1, t->posY, t->fontSize, RAYWHITE);
-        DrawRectangle(t->posX + MeasureText(TextSubtext(t->text, 0, t->cursor), t->fontSize), t->posY + t->height - 2, t->fontSize - 5, 2, RAYWHITE); 
+        if (t->cursor > t->maxDispWidth) {
+            DrawText(TextSubtext(t->text, t->cursor - t->maxDispWidth, t->maxLen), t->posX + 1, t->posY, t->fontSize, RAYWHITE);
+            DrawRectangle(t->posX + MeasureText(TextSubtext(t->text, t->cursor - t->maxDispWidth, t->cursor), t->fontSize), t->posY + t->height - 2, t->fontSize - 5, 2, RAYWHITE);
+        } else {
+            DrawText(t->text, t->posX + 1, t->posY, t->fontSize, RAYWHITE);
+            DrawRectangle(t->posX + MeasureText(TextSubtext(t->text, 0, t->cursor), t->fontSize), t->posY + t->height - 2, t->fontSize - 5, 2, RAYWHITE);
+        } 
     } else {
         DrawRectangleRec(t->background, (Color){245, 245, 245, 150});
         DrawRectangleRec(t->editBox, (Color){10, 10, 10, 150});
         DrawText(t->text, t->posX + 1, t->posY, t->fontSize, (Color){245, 245, 245, 150});
     }
-    
 }
 
 int traverseMenu(Menu* m, int menuType) {
@@ -151,6 +171,27 @@ int traverseMenu(Menu* m, int menuType) {
                 default:
                     break;
             }
+            break;
+        case TEXT_ENTRY:
+            if (!m->tBox[m->cursor].editing) {
+                switch (GetKeyPressed()) {
+                    case KEY_UP:
+                        m->cursor = (m->cursor == 0) ? m->numSel - 1 : m->cursor - 1;
+                        retVal = -1;
+                        break;
+                    case KEY_DOWN:
+                        m->cursor = (m->cursor + 1) % m->numSel;
+                        retVal = -1;
+                        break;
+                    case KEY_ENTER:
+                        if (!m->tBox[m->cursor].editing) {
+                            m->tBox[m->cursor].editing = true;
+                        }
+                        break;
+                }
+            } else {
+                editTextBox(&m->tBox[m->cursor]);
+            }            
             break;
         default:
             break;
