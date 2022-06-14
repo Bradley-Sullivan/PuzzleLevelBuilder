@@ -14,12 +14,23 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
-#include "include/raylib.h"
+#include <raylib.h>
+// uncomment if Linux compilation is borked
+// #include "include/raylib.h"
 #include "menu.h"
 #include "param.h"
 
+/*
+    Want to implement a system for indexing into tile attr array.
+    Thinking of using a master macro system to easily ID seemingly
+    arbitrary attr. array indices.
+
+    Tile attr's need to be SOLID cuz editing attribute indices with
+    that system is a pain in the fuck
+*/
+
 typedef struct Tile {
-    char tileID;
+    char* tileID;
 
     bool playerColl;        // has player collision
     bool entityColl;        // has entity collision
@@ -34,9 +45,10 @@ typedef struct Tile {
     int texIndex;           // tex-sheet index
     int row;                // tile's row-position in level grid
     int col;                // tile's column-position in level grid
+    int eSpawnChannel;
     int teleChannel;        // teleporter channel
     
-    int attr[13];           // tile's attributes
+    int attr[14];           // tile's attributes
 
 } Tile;
 
@@ -111,6 +123,8 @@ typedef enum BuildState {
     EXIT
 } BuildState;
 
+void initWorkspace(Workspace* w);
+
 bool initLevel(Level* l, char* id, int texIdx, int r, int c);
 void previewTextures(Workspace* w, int tex);
 bool loadTextures(Workspace* w);
@@ -120,23 +134,19 @@ void renderWorkspace(Workspace* w);
 void drawTileAttr(Tile t, double x, double y);
 
 BuildState mainMenuScreen(Menu* m);
-BuildState levelInitConfig(Menu* m, TextBox* t, Workspace* w);
+BuildState levelInitConfig(Menu* m, Workspace* w);
 BuildState editingLoop(Workspace* w);
 
 int main(void) {
     Workspace editWorkspace;
     BuildState state = MAIN_MENU;
     Menu mainMenu, levelConfMenu, editSideMenu, editContextMenu;
-    TextBox levelIDTextBox;
-
-    editWorkspace.activeEditLevel = 0;
-    editWorkspace.nextNewLevel = 0;
 
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "test");
     ToggleFullscreen();
     SetTargetFPS(60);
 
-    loadTextures(&editWorkspace);
+    initWorkspace(&editWorkspace);
 
     char mainMenuSel[4][MAX_MENU_LEN] = {"NEW", "LOAD", "HELP", "EXIT"};
     int mainMenuTypes[4] = {SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU};
@@ -144,7 +154,7 @@ int main(void) {
 
     char levelConfMenuSel[5][MAX_MENU_LEN] = {"Level ID", "Rows", "Columns", "Init Floor Tex.", "CONFIRM"};
     int levelConfMenuTypes[5] = {TEXT_ENTRY, PLUS_MINUS_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU, SIMPLE_MENU};
-    initTextBox(&levelIDTextBox, MAX_LEVEL_ID_LEN, 20, 0, EDIT_WIDTH - 20 * MAX_LEVEL_ID_LEN, 20);
+    // initTextBox(&levelIDTextBox, MAX_LEVEL_ID_LEN, 20, 0, EDIT_WIDTH - 20 * MAX_LEVEL_ID_LEN, 20);
     initMenu(&levelConfMenu, 5, 0, 20, levelConfMenuSel, levelConfMenuTypes);
 
     while (!WindowShouldClose() && state != EXIT) {
@@ -156,7 +166,7 @@ int main(void) {
                     state = mainMenuScreen(&mainMenu);
                     break;
                 case NEW_LEVEL:
-                    state = levelInitConfig(&levelConfMenu, &levelIDTextBox, &editWorkspace);
+                    state = levelInitConfig(&levelConfMenu, &editWorkspace);
                     break;
                 case LOAD_LEVEL:
                     break;
@@ -174,6 +184,15 @@ int main(void) {
         EndDrawing();
     }
     return 0;
+}
+
+void initWorkspace(Workspace* w) {
+    loadTextures(w);
+
+    w->activeEditLevel = 0;
+    w->nextNewLevel = 0;
+    w->cursorCol = 0;
+    w->cursorRow = 0;
 }
 
 bool initLevel(Level* l, char* id, int texIdx, int r, int c) {
@@ -198,9 +217,12 @@ bool initLevel(Level* l, char* id, int texIdx, int r, int c) {
 
         for (int i = 0; i < r; i++) {
             for (int j = 0; j < c; j++) {
+                l->tiles[i][j].tileID = (char*)malloc(sizeof(char) * MAX_TILE_ID_LEN);
                 l->tiles[i][j].texIndex = texIdx;
                 l->tiles[i][j].row = i;
                 l->tiles[i][j].col = j;
+                for (int k = 0; k < 14; k++) l->tiles[i][j].attr[k] = 0;                // this line probably needs to go or be changed
+                for (int k = 0; k < MAX_TILE_ID_LEN; k++) l->tiles[i][j].tileID = "\0";
             }
         }
 
@@ -234,11 +256,11 @@ bool loadTextures(Workspace* w) {
     w->entityTex = (Texture2D*)malloc(sizeof(Texture2D) * MAX_NUM_TEX);
     w->otherTex = (Texture2D*)malloc(sizeof(Texture2D) * MAX_NUM_TEX);
 
+    w->cursorTex = LoadTexture(CURSOR_FILEPATH);
+
     w->numTileTex = loadTexHelper(w->tileTex, TILE_DIRECTORY);
     w->numEntityTex = loadTexHelper(w->entityTex, ENTITY_DIRECTORY);
     w->numOtherTex = loadTexHelper(w->otherTex, OTHER_DIRECTORY);
-
-    w->cursorTex = LoadTexture(CURSOR_FILEPATH);
 
     printf("%d tile textures loaded\n", w->numTileTex);
     printf("%d entity textures loaded\n", w->numEntityTex);
@@ -256,12 +278,12 @@ int loadTexHelper(Texture2D dest[], char* dir) {
         texNames[i] = (char*)malloc(sizeof(char) * MAX_FILENAME_LEN);
     }
 
-    texNames = LoadDirectoryFiles(dir, &numTex);
+    texNames = GetDirectoryFiles(dir, &numTex);
     ChangeDirectory(dir);
 
     for (int i = 0; i < numTex; i++) {
         if (IsFileExtension(texNames[i], ".png")) {
-            printf("loading texture %s\n", texNames[i]);
+            // printf("loading texture %s\n", texNames[i]);
             dest[curTex] = LoadTexture(texNames[i]);
             curTex++;
         }
@@ -292,7 +314,25 @@ void renderWorkspace(Workspace* w) {
 }
 
 void drawTileAttr(Tile t, double x, double y) {
+    static Menu dispMenu;
+    static char attr[15][MAX_MENU_LEN] = {"TileID", "Player Coll.", "Entity Coll.", "Proj. Coll.", 
+                                   "Moveable", "Player Spawn", "Entity Spawn", "Level End", 
+                                   "Teleporter", "1-Way Tele.", "Tex. Index", "Row Pos.", 
+                                   "Col Pos.", "Entity Sp. Channel", "Tele Channel"};
+    static int attrMenTypes[15] = {TEXT_ENTRY, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, 
+                            CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, 
+                            CHECKLIST_MENU, CHECKLIST_MENU, SIMPLE_MENU, SIMPLE_MENU, 
+                            SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU};
+    initMenu(&dispMenu, 15, 0, 20, attr, attrMenTypes);
 
+    dispMenu.tBox[0].text = t.tileID;
+
+    // i don't like this method of handling/using attribute values
+    for (int i = 0; i < 14; i++) {
+        dispMenu.menuVals[i] = t.attr[i];
+    }
+
+    drawMenu(&dispMenu);
 }
 
 BuildState mainMenuScreen(Menu *m) {
@@ -326,22 +366,14 @@ BuildState mainMenuScreen(Menu *m) {
     return MAIN_MENU;
 }
 
-BuildState levelInitConfig(Menu* m, TextBox* t, Workspace *w) {
+BuildState levelInitConfig(Menu* m, Workspace *w) {
     drawMenu(m);
 
     previewTextures(w, m->menuVals[3]);
 
     switch (m->cursor) {
         case 0:
-            if (!t->editing) {
-                if (traverseMenu(m, SIMPLE_MENU) == KEY_ENTER) {
-                    t->editing = true;
-                }
-                drawTextBox(t, false);
-            } else {
-                editTextBox(t);
-                drawTextBox(t, true);
-            }
+            traverseMenu(m, TEXT_ENTRY);
             break;
         case 1:
             traverseMenu(m, PLUS_MINUS_MENU);
@@ -358,7 +390,7 @@ BuildState levelInitConfig(Menu* m, TextBox* t, Workspace *w) {
             break;
         case 4:
             if (traverseMenu(m, SIMPLE_MENU) == KEY_ENTER) {
-                if (initLevel(&w->levels[w->nextNewLevel], t->text, m->menuVals[3], m->menuVals[1], m->menuVals[2])) {
+                if (initLevel(&w->levels[w->nextNewLevel], m->tBox[0].text, m->menuVals[3], m->menuVals[1], m->menuVals[2])) {
                     printf("Successfully initialized level\n");
                     printf("\tLevel ID: %s\n", w->levels[w->nextNewLevel].levelID);
                     printf("\tLevel Rows: %d\n", w->levels[w->nextNewLevel].numRows);
@@ -402,6 +434,8 @@ BuildState editingLoop(Workspace* w) {
             w->cursorRow = 0;
         }
     }
+
+    drawTileAttr(w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol], 0, 0);
 
     return EDITING;
 }

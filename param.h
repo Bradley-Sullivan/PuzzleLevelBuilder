@@ -17,10 +17,10 @@
 #define TILE_PIX_WIDTH     32
 #define TILE_PIX_HEIGHT    32
 
-#define TILE_DIRECTORY     "/home/brsul/Nextcloud/Programs/C/Games/PuzzleLevelBuilder/assets/Tile"
-#define ENTITY_DIRECTORY   "/home/brsul/Nextcloud/Programs/C/Games/PuzzleLevelBuilder/assets/Entity"
-#define OTHER_DIRECTORY    "/home/brsul/Nextcloud/Programs/C/Games/PuzzleLevelBuilder/assets/Other"
-#define CURSOR_FILEPATH    "/home/brsul/Nextcloud/Programs/C/Games/PuzzleLevelBuilder/assets/cursor.png"
+#define TILE_DIRECTORY     "assets/Tile"
+#define ENTITY_DIRECTORY   "assets/Entity"
+#define OTHER_DIRECTORY    "assets/Other"
+#define CURSOR_FILEPATH    "assets/cursor.png"
 
 #define MAX_NUM_LEVELS     128
 #define MAX_LEVEL_ROWS     64
@@ -28,3 +28,4 @@
 
 #define MAX_NUM_TEX        128
 #define MAX_FILENAME_LEN   64
+#define MAX_TILE_ID_LEN    16
