@@ -32,21 +32,21 @@
 typedef struct Tile {
     char* tileID;
 
-    bool playerColl;        // has player collision
-    bool entityColl;        // has entity collision
-    bool projectileColl;    // has proj. collision
-    bool moveable;          // player-mutable position
-    bool pSpawn;            // player initial spawn point
-    bool eSpawn;            // entity spawn point
-    bool levelEnd;          // level end goal
-    bool teleporter;        // teleporter tile
-    bool oneWayTeleporter;  // one-way teleporter tile flag (teleporter flag gets inverted once tele is taken)
+    // bool playerColl;        // has player collision
+    // bool entityColl;        // has entity collision
+    // bool projectileColl;    // has proj. collision
+    // bool moveable;          // player-mutable position
+    // bool pSpawn;            // player initial spawn point
+    // bool eSpawn;            // entity spawn point
+    // bool levelEnd;          // level end goal
+    // bool teleporter;        // teleporter tile
+    // bool oneWayTeleporter;  // one-way teleporter tile flag (teleporter flag gets inverted once tele is taken)
     
-    int texIndex;           // tex-sheet index
-    int row;                // tile's row-position in level grid
-    int col;                // tile's column-position in level grid
-    int eSpawnChannel;
-    int teleChannel;        // teleporter channel
+    // int texIndex;           // tex-sheet index
+    // int row;                // tile's row-position in level grid
+    // int col;                // tile's column-position in level grid
+    // int eSpawnChannel;
+    // int teleChannel;        // teleporter channel
     
     int attr[14];           // tile's attributes
 
@@ -55,27 +55,29 @@ typedef struct Tile {
 typedef struct Entity {
     char entityID;              // entity identifier used for quickly handling entity-related events?
 
-    bool isHostile;             // enemy/entity which does directly harm
-    bool isPassive;             // enemy/entity which does not directly harm
-    bool isActive;              // basic state variable
-    bool isTriggerHead;         // is main point of trigger for other entities on same channel
-    bool isTextured;            // is not blank texture
-    bool playerColl;            // has player collision
-    bool entityColl;            // has base entity collision
-    bool projectileColl;        // has proj. collision
-    bool activeInteract;        // interactable with player "use" key
-    bool passiveInteract;       // interactable with player collision
+    // bool isHostile;             // enemy/entity which does directly harm
+    // bool isPassive;             // enemy/entity which does not directly harm
+    // bool isActive;              // basic state variable
+    // bool isTriggerHead;         // is main point of trigger for other entities on same channel
+    // bool isTextured;            // is not blank texture
+    // bool playerColl;            // has player collision
+    // bool entityColl;            // has base entity collision
+    // bool projectileColl;        // has proj. collision
+    // bool activeInteract;        // interactable with player "use" key
+    // bool passiveInteract;       // interactable with player collision
 
-    int effectMag;              // gen. purpose effect magnitude var.
-    int dirX;                   // projectile/enemy/etc. x sign
-    int dirY;                   // projectile/enemy/etc. y sign
-    int texIndex;               // texture to be drawn passively (i.e. by default)
-    int activeTexIndex;         // texture to be drawn on true active state
-    int triggerChannel;         // default trigger channel -> -1
+    // int effectMag;              // gen. purpose effect magnitude var.
+    // int dirX;                   // projectile/enemy/etc. x sign
+    // int dirY;                   // projectile/enemy/etc. y sign
+    // int texIndex;               // texture to be drawn passively (i.e. by default)
+    // int activeTexIndex;         // texture to be drawn on true active state
+    // int triggerChannel;         // default trigger channel -> -1
 
-    double posX;                // entity x-position
-    double posY;                // entity y-position
-    double moveSpeed;           // entity moving step value
+    // double posX;                // entity x-position
+    // double posY;                // entity y-position
+    // double moveSpeed;           // entity moving step value
+
+    int attr[19];
 
     Rectangle collisionRec;     // entity "hitbox" used for judging collisions
 
@@ -93,6 +95,8 @@ typedef struct Level {
 
 typedef struct Workspace {
     Level levels[MAX_NUM_LEVELS];
+
+    bool editingTile;
 
     int activeEditLevel;
     int nextNewLevel;
@@ -135,12 +139,12 @@ void drawTileAttr(Tile t, double x, double y);
 
 BuildState mainMenuScreen(Menu* m);
 BuildState levelInitConfig(Menu* m, Workspace* w);
-BuildState editingLoop(Workspace* w);
+BuildState editingLoop(Workspace* w, Menu* editContextMenu);
 
 int main(void) {
     Workspace editWorkspace;
     BuildState state = MAIN_MENU;
-    Menu mainMenu, levelConfMenu, editSideMenu, editContextMenu;
+    Menu mainMenu, levelConfMenu, editContextMenu;
 
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "test");
     ToggleFullscreen();
@@ -150,12 +154,21 @@ int main(void) {
 
     char mainMenuSel[4][MAX_MENU_LEN] = {"NEW", "LOAD", "HELP", "EXIT"};
     int mainMenuTypes[4] = {SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU};
-    initMenu(&mainMenu, 4, 0, 30, mainMenuSel, mainMenuTypes);
+    initMenu(&mainMenu, 4, 0, 30, mainMenuSel, mainMenuTypes, false);
 
     char levelConfMenuSel[5][MAX_MENU_LEN] = {"Level ID", "Rows", "Columns", "Init Floor Tex.", "CONFIRM"};
     int levelConfMenuTypes[5] = {TEXT_ENTRY, PLUS_MINUS_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU, SIMPLE_MENU};
-    // initTextBox(&levelIDTextBox, MAX_LEVEL_ID_LEN, 20, 0, EDIT_WIDTH - 20 * MAX_LEVEL_ID_LEN, 20);
-    initMenu(&levelConfMenu, 5, 0, 20, levelConfMenuSel, levelConfMenuTypes);
+    initMenu(&levelConfMenu, 5, 0, 20, levelConfMenuSel, levelConfMenuTypes, false);
+
+    char editContextMenuSel[15][MAX_MENU_LEN] = {"TileID", "Player Coll.", "Entity Coll.", "Proj. Coll.", 
+                                                "Moveable", "Player Spawn", "Entity Spawn", "Level End", 
+                                                "Teleporter", "1-Way Tele.", "Tex. Index", "Row Pos.", 
+                                                "Col Pos.", "Entity Sp. Channel", "Tele Channel"};
+    int editContextMenuTypes[15] = {TEXT_ENTRY, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, 
+                                    CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, 
+                                    CHECKLIST_MENU, CHECKLIST_MENU, PLUS_MINUS_MENU, DISPLAY_VAL, 
+                                    DISPLAY_VAL, PLUS_MINUS_MENU, PLUS_MINUS_MENU};
+    initMenu(&editContextMenu, 15, 0, 15, editContextMenuSel, editContextMenuTypes, true);
 
     while (!WindowShouldClose() && state != EXIT) {
         BeginDrawing();
@@ -171,7 +184,7 @@ int main(void) {
                 case LOAD_LEVEL:
                     break;
                 case EDITING:
-                    state = editingLoop(&editWorkspace);
+                    state = editingLoop(&editWorkspace, &editContextMenu);
                     break;
                 case SAVE_EXPORT:
                     break;
@@ -189,6 +202,7 @@ int main(void) {
 void initWorkspace(Workspace* w) {
     loadTextures(w);
 
+    w->editingTile = false;
     w->activeEditLevel = 0;
     w->nextNewLevel = 0;
     w->cursorCol = 0;
@@ -218,10 +232,10 @@ bool initLevel(Level* l, char* id, int texIdx, int r, int c) {
         for (int i = 0; i < r; i++) {
             for (int j = 0; j < c; j++) {
                 l->tiles[i][j].tileID = (char*)malloc(sizeof(char) * MAX_TILE_ID_LEN);
-                l->tiles[i][j].texIndex = texIdx;
-                l->tiles[i][j].row = i;
-                l->tiles[i][j].col = j;
-                for (int k = 0; k < 14; k++) l->tiles[i][j].attr[k] = 0;                // this line probably needs to go or be changed
+                for (int k = 0; k < 19; k++) l->tiles[i][j].attr[k] = 0;
+                l->tiles[i][j].attr[T_TEXTURE_IDX] = texIdx;
+                l->tiles[i][j].attr[T_ROW] = i;
+                l->tiles[i][j].attr[T_COL] = j;
                 for (int k = 0; k < MAX_TILE_ID_LEN; k++) l->tiles[i][j].tileID = "\0";
             }
         }
@@ -283,7 +297,6 @@ int loadTexHelper(Texture2D dest[], char* dir) {
 
     for (int i = 0; i < numTex; i++) {
         if (IsFileExtension(texNames[i], ".png")) {
-            // printf("loading texture %s\n", texNames[i]);
             dest[curTex] = LoadTexture(texNames[i]);
             curTex++;
         }
@@ -303,7 +316,7 @@ void renderWorkspace(Workspace* w) {
         for (int k = 0; k < cols; k++) {
             xOffset = (EDIT_WIDTH / 2) - ((w->cursorCol - k) * TILE_PIX_WIDTH) - (TILE_PIX_WIDTH / 2);
             yOffset = (EDIT_HEIGHT / 2) - ((w->cursorRow - i) * TILE_PIX_HEIGHT) - (TILE_PIX_HEIGHT / 2);
-            int tex = w->levels[w->activeEditLevel].tiles[i][k].texIndex;
+            int tex = w->levels[w->activeEditLevel].tiles[i][k].attr[T_TEXTURE_IDX];
             if (xOffset < EDIT_WIDTH - (TILE_PIX_WIDTH / 2)) {
                 DrawTexture(w->tileTex[tex], xOffset, yOffset, WHITE);
             }
@@ -321,15 +334,14 @@ void drawTileAttr(Tile t, double x, double y) {
                                    "Col Pos.", "Entity Sp. Channel", "Tele Channel"};
     static int attrMenTypes[15] = {TEXT_ENTRY, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, 
                             CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, 
-                            CHECKLIST_MENU, CHECKLIST_MENU, SIMPLE_MENU, SIMPLE_MENU, 
-                            SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU};
-    initMenu(&dispMenu, 15, 0, 20, attr, attrMenTypes);
+                            CHECKLIST_MENU, CHECKLIST_MENU, DISPLAY_VAL, DISPLAY_VAL, 
+                            DISPLAY_VAL, DISPLAY_VAL, DISPLAY_VAL};
+    initMenu(&dispMenu, 15, 0, 20, attr, attrMenTypes, false);
 
     dispMenu.tBox[0].text = t.tileID;
 
-    // i don't like this method of handling/using attribute values
     for (int i = 0; i < 14; i++) {
-        dispMenu.menuVals[i] = t.attr[i];
+        dispMenu.menuVals[i + 1] = t.attr[i];
     }
 
     drawMenu(&dispMenu);
@@ -410,8 +422,16 @@ BuildState levelInitConfig(Menu* m, Workspace *w) {
     return NEW_LEVEL;
 }
 
-BuildState editingLoop(Workspace* w) {
+BuildState editingLoop(Workspace* w, Menu* editContextMenu) {
     renderWorkspace(w);
+
+    if (w->editingTile) {
+        editContextMenu->tBox[0].text = w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol].tileID;
+        for (int i = 0; i < 14; i++) {
+            editContextMenu->menuVals[i + 1] = w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol].attr[i];
+        }
+        drawMenu(editContextMenu);
+    }
 
     if (IsKeyPressed(KEY_RIGHT)) {
         w->cursorCol++;
@@ -432,6 +452,14 @@ BuildState editingLoop(Workspace* w) {
         w->cursorRow++;
         if (w->cursorRow >= w->levels[w->activeEditLevel].numRows) {
             w->cursorRow = 0;
+        }
+    } else if (IsKeyPressed(KEY_SPACE)) {
+        if (!w->editingTile) {
+            w->editingTile = true;
+        }
+    } else if (IsKeyPressed(KEY_ENTER)) {
+        if (w->editingTile) {
+            w->editingTile = false;
         }
     }
 
