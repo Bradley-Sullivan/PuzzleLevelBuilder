@@ -1,8 +1,9 @@
 #include "menu.h"
 
-void initMenu(Menu *m, int numSel, int initCursor, int selFontSize, char sel[][MAX_MENU_LEN], int types[]) {
+void initMenu(Menu *m, int numSel, int initCursor, int selFontSize, char sel[][MAX_MENU_LEN], int types[], bool isContextMenu) {
     int numTextEntry = 0;
 
+    m->isContextMenu = isContextMenu;
     m->cursor = initCursor;
     m->numSel = numSel;
     m->selFS = selFontSize;
@@ -24,6 +25,9 @@ void initMenu(Menu *m, int numSel, int initCursor, int selFontSize, char sel[][M
         m->tBox = (TextBox*)malloc(sizeof(TextBox) * numSel);
         for (int i = 0; i < numSel; i++) {
             if (m->menuTypes[i] == TEXT_ENTRY) {
+
+                // insert a different tBox initialization for context menus
+
                 initTextBox(&m->tBox[i], 10, m->selFS, 0, EDIT_WIDTH - (m->selFS * 11), ((i + 1) * m->selFS));
             }
         }
@@ -58,35 +62,58 @@ void initTextBox(TextBox* t, int editDisplayWidth, int fontSize, int initCursor,
 }
 
 void drawMenu(Menu* m) {
-    int begOffset = EDIT_WIDTH + 2 * m->selFS;
+    int begOffset, yOffset;
+    char buf[8];
+
+    if (m->isContextMenu) {
+        begOffset = WINDOW_WIDTH / 2;
+    } else {
+        begOffset = EDIT_WIDTH + 2 * m->selFS;
+    }
+
+
     for (int i = 0; i < m->numSel; i++) {
-        int yOffset = m->selFS + (i * m->selFS);
-        DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
+
+        if (m->isContextMenu) {
+            yOffset = (WINDOW_HEIGHT / 2) + (i * m->selFS);
+        } else {
+            yOffset = m->selFS + (i * m->selFS);
+        }
+
         switch (m->menuTypes[i]) {
             case SIMPLE_MENU:
+                DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
+                DrawText(">", EDIT_WIDTH + m->selFS, m->selFS + (m->cursor * m->selFS), m->selFS, RAYWHITE);
                 break;
             case PLUS_MINUS_MENU:
-                char buf[8];
+                DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
                 sprintf(buf, "- %d +", m->menuVals[i]);
                 DrawText(buf, begOffset + 10 + MeasureText(m->sel[i], m->selFS), yOffset, m->selFS, RAYWHITE);
+                DrawText(">", EDIT_WIDTH + m->selFS, m->selFS + (m->cursor * m->selFS), m->selFS, RAYWHITE);
                 break;
             case CHECKLIST_MENU:
                 DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
                 if (m->menuVals[i]) {
-                    DrawText("[x]", begOffset + 5 + MeasureText(m->sel[i], m->selFS), yOffset, m->selFS, RAYWHITE);
+                    DrawText("[x]", begOffset + 50 + MeasureText(m->sel[i], m->selFS), yOffset, m->selFS, RAYWHITE);
                 } else {
-                    DrawText("[ ]", begOffset + 5 + MeasureText(m->sel[i], m->selFS), yOffset, m->selFS, RAYWHITE);
+                    DrawText("[ ]", begOffset + 50 + MeasureText(m->sel[i], m->selFS), yOffset, m->selFS, RAYWHITE);
                 }
+                DrawText(">", EDIT_WIDTH + m->selFS, m->selFS + (m->cursor * m->selFS), m->selFS, RAYWHITE);
                 break;
             case TEXT_ENTRY:
+                DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
                 drawTextBox(&m->tBox[i], m->tBox[i].editing);
+                DrawText(">", EDIT_WIDTH + m->selFS, m->selFS + (m->cursor * m->selFS), m->selFS, RAYWHITE);
+                break;
+            case DISPLAY_VAL:
+                DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
+                sprintf(buf, "%d", m->menuVals[i]);
+                DrawText(buf, begOffset + 50 + MeasureText(m->sel[i], m->selFS), yOffset, m->selFS, RAYWHITE);
                 break;
             default:
                 break;
         }
     }
-
-    DrawText(">", EDIT_WIDTH + m->selFS, m->selFS + (m->cursor * m->selFS), m->selFS, RAYWHITE);
 }
 
 void drawTextBox(TextBox* t, bool active) {
@@ -228,7 +255,7 @@ bool editTextBox(TextBox* t) {
             }
             break;
         case KEY_RIGHT:
-            if (t->cursor < t->maxLen - 1) {
+            if (t->cursor < t->maxLen - 1 && t->text[0] != '\0') {
                 t->cursor += 1;
             }
             break;

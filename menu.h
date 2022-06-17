@@ -23,6 +23,7 @@
 #define PLUS_MINUS_MENU     1
 #define CHECKLIST_MENU      2
 #define TEXT_ENTRY          3
+#define DISPLAY_VAL         4
 
 typedef struct TextBox {
     bool editing;
@@ -45,6 +46,8 @@ typedef struct TextBox {
 } TextBox;
 
 typedef struct Menu {
+    bool isContextMenu;
+
     int cursor;
     int numSel;
     int selFS;
@@ -57,7 +60,7 @@ typedef struct Menu {
     TextBox* tBox;
 } Menu;
 
-void initMenu(Menu* m, int numSel, int initCursor, int selFontSize, char sel[][MAX_MENU_LEN], int types[]);
+void initMenu(Menu* m, int numSel, int initCursor, int selFontSize, char sel[][MAX_MENU_LEN], int types[], bool isContextMenu);
 void initTextBox(TextBox* t, int editDisplayWidth, int fontSize, int initCursor, double x, double y);
 
 void drawMenu(Menu* m);
