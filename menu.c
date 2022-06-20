@@ -64,6 +64,24 @@ void initTextBox(TextBox* t, int editDisplayWidth, int fontSize, int initCursor,
     }
 }
 
+void resetMenu(Menu* m) {
+    for (int i = 0; i < m->numSel; i++) {
+        m->menuVals[i] = 0;
+        if (m->menuTypes[i] == TEXT_ENTRY) {
+            clearTextBox(&m->tBox[i]);
+        }
+    }
+}
+
+void clearTextBox(TextBox* t) {
+    t->editing = false;
+    t->cursor = 0;
+
+    for (int i = 0; i < MAX_TEXT_ENTRY_LEN; i++) {
+        t->text[i] = '\0';
+    }
+}
+
 void drawMenu(Menu* m) {
     int begOffset, yOffset;
     int identSelSize = getLongSelSize(m) + 50;

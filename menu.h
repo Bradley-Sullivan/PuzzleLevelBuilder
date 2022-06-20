@@ -64,6 +64,9 @@ void initMenu(Menu* m, int numSel, int initCursor, int selFontSize, char sel[][M
 void initTextBox(TextBox* t, int editDisplayWidth, int fontSize, int initCursor, double x, double y);
 
 // add reset/clear functions for menu and tboxes
+void resetMenu(Menu* m);
+
+void clearTextBox(TextBox* t);
 
 void drawMenu(Menu* m);
 void drawTextBox(TextBox* t, bool active);
