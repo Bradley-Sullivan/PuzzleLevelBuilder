@@ -160,15 +160,15 @@ int main(void) {
     int levelConfMenuTypes[5] = {TEXT_ENTRY, PLUS_MINUS_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU, SIMPLE_MENU};
     initMenu(&levelConfMenu, 5, 0, 20, levelConfMenuSel, levelConfMenuTypes, false);
 
-    char editContextMenuSel[15][MAX_MENU_LEN] = {"TileID", "Player Coll.", "Entity Coll.", "Proj. Coll.", 
+    char editContextMenuSel[16][MAX_MENU_LEN] = {"TileID", "Player Coll.", "Entity Coll.", "Proj. Coll.", 
                                                 "Moveable", "Player Spawn", "Entity Spawn", "Level End", 
                                                 "Teleporter", "1-Way Tele.", "Tex. Index", "Row Pos.", 
-                                                "Col Pos.", "Entity Sp. Channel", "Tele Channel"};
-    int editContextMenuTypes[15] = {TEXT_ENTRY, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, 
+                                                "Col Pos.", "Entity Sp. Channel", "Tele Channel", "CONFIRM"};
+    int editContextMenuTypes[16] = {TEXT_ENTRY, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, 
                                     CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, 
                                     CHECKLIST_MENU, CHECKLIST_MENU, PLUS_MINUS_MENU, DISPLAY_VAL, 
-                                    DISPLAY_VAL, PLUS_MINUS_MENU, PLUS_MINUS_MENU};
-    initMenu(&editContextMenu, 15, 0, 15, editContextMenuSel, editContextMenuTypes, true);
+                                    DISPLAY_VAL, PLUS_MINUS_MENU, PLUS_MINUS_MENU, SIMPLE_MENU};
+    initMenu(&editContextMenu, 16, 0, 15, editContextMenuSel, editContextMenuTypes, true);
 
     while (!WindowShouldClose() && state != EXIT) {
         BeginDrawing();
@@ -211,10 +211,10 @@ void initWorkspace(Workspace* w) {
 
 bool initLevel(Level* l, char* id, int texIdx, int r, int c) {
     if (r <= 0 || c <= 0) {
-        printf("invalid level dimensions\n");
+        printf("\nERROR: invalid level dimensions\n\n");
         return false;
     } else if (texIdx < 0) {
-        printf("invalid texture index\n");
+        printf("\nERROR: invalid texture index\n\n");
         return false;
     } else {
         l->levelID = (char*)malloc(sizeof(char) * MAX_LEVEL_ID_LEN);
@@ -232,11 +232,10 @@ bool initLevel(Level* l, char* id, int texIdx, int r, int c) {
         for (int i = 0; i < r; i++) {
             for (int j = 0; j < c; j++) {
                 l->tiles[i][j].tileID = (char*)malloc(sizeof(char) * MAX_TILE_ID_LEN);
-                for (int k = 0; k < 19; k++) l->tiles[i][j].attr[k] = 0;
+                for (int k = 0; k < 14; k++) l->tiles[i][j].attr[k] = 0;
                 l->tiles[i][j].attr[T_TEXTURE_IDX] = texIdx;
                 l->tiles[i][j].attr[T_ROW] = i;
                 l->tiles[i][j].attr[T_COL] = j;
-                for (int k = 0; k < MAX_TILE_ID_LEN; k++) l->tiles[i][j].tileID = "\0";
             }
         }
 
@@ -338,7 +337,7 @@ void drawTileAttr(Tile t, double x, double y) {
                             DISPLAY_VAL, DISPLAY_VAL, DISPLAY_VAL};
     initMenu(&dispMenu, 15, 0, 20, attr, attrMenTypes, false);
 
-    dispMenu.tBox[0].text = t.tileID;
+    for (int i = 0; i < MAX_TEXT_ENTRY_LEN; i++) dispMenu.tBox[0].text[i] = t.tileID[i];
 
     for (int i = 0; i < 14; i++) {
         dispMenu.menuVals[i + 1] = t.attr[i];
@@ -426,44 +425,69 @@ BuildState editingLoop(Workspace* w, Menu* editContextMenu) {
     renderWorkspace(w);
 
     if (w->editingTile) {
-        editContextMenu->tBox[0].text = w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol].tileID;
-        for (int i = 0; i < 14; i++) {
-            editContextMenu->menuVals[i + 1] = w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol].attr[i];
-        }
+        int trVal = traverseMenu(editContextMenu, editContextMenu->menuTypes[editContextMenu->cursor]);
         drawMenu(editContextMenu);
-    }
 
-    if (IsKeyPressed(KEY_RIGHT)) {
-        w->cursorCol++;
-        if (w->cursorCol >= w->levels[w->activeEditLevel].numCols) {
-            w->cursorCol = 0;
-        }
-    } else if (IsKeyPressed(KEY_LEFT)) {
-        w->cursorCol--;
-        if (w->cursorCol < 0) {
-            w->cursorCol = w->levels[w->activeEditLevel].numCols - 1;
-        }
-    } else if (IsKeyPressed(KEY_UP)) {
-        w->cursorRow--;
-        if (w->cursorRow < 0) {
-            w->cursorRow = w->levels[w->activeEditLevel].numRows - 1;
-        }
-    } else if (IsKeyPressed(KEY_DOWN)) {
-        w->cursorRow++;
-        if (w->cursorRow >= w->levels[w->activeEditLevel].numRows) {
-            w->cursorRow = 0;
-        }
-    } else if (IsKeyPressed(KEY_SPACE)) {
-        if (!w->editingTile) {
-            w->editingTile = true;
-        }
-    } else if (IsKeyPressed(KEY_ENTER)) {
-        if (w->editingTile) {
+        if (trVal == KEY_ENTER && editContextMenu->cursor == editContextMenu->numSel - 1) {
             w->editingTile = false;
+            // commit changes in menu to tile attr.
+            for (int i = 1; i < 15; i++) {
+                w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol].attr[i - 1] = editContextMenu->menuVals[i];
+            }
+
+            for (int i = 0; i < MAX_TILE_ID_LEN; i++) {
+                w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol].tileID[i] = editContextMenu->tBox[0].text[i];
+            }
+        } else if (editContextMenu->cursor == T_TEXTURE_IDX + 1) {
+            if (editContextMenu->menuVals[T_TEXTURE_IDX + 1] > w->numTileTex - 1) {
+                editContextMenu->menuVals[T_TEXTURE_IDX + 1] = w->numTileTex - 1;
+            } else if (editContextMenu->menuVals[T_TEXTURE_IDX + 1] < 0) {
+                editContextMenu->menuVals[T_TEXTURE_IDX + 1] = 0;
+            }
+            previewTextures(w, editContextMenu->menuVals[T_TEXTURE_IDX + 1]);
+        }
+
+    } else {
+        drawTileAttr(w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol], 0, 0);
+
+        if (IsKeyPressed(KEY_RIGHT)) {
+            w->cursorCol++;
+            if (w->cursorCol >= w->levels[w->activeEditLevel].numCols) {
+                w->cursorCol = 0;
+            }
+        } else if (IsKeyPressed(KEY_LEFT)) {
+            w->cursorCol--;
+            if (w->cursorCol < 0) {
+                w->cursorCol = w->levels[w->activeEditLevel].numCols - 1;
+            }
+        } else if (IsKeyPressed(KEY_UP)) {
+            w->cursorRow--;
+            if (w->cursorRow < 0) {
+                w->cursorRow = w->levels[w->activeEditLevel].numRows - 1;
+            }
+        } else if (IsKeyPressed(KEY_DOWN)) {
+            w->cursorRow++;
+            if (w->cursorRow >= w->levels[w->activeEditLevel].numRows) {
+                w->cursorRow = 0;
+            }
+        } else if (IsKeyPressed(KEY_SPACE)) {
+            if (!w->editingTile) {
+                w->editingTile = true;
+
+                // copy current tile attr. into menu vals
+                editContextMenu->cursor = 0;
+                for (int i = 1; i < 15; i++) {
+                    editContextMenu->menuVals[i] = w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol].attr[i - 1];
+                }
+
+                for (int i = 0; i < MAX_TILE_ID_LEN; i++) {
+                    editContextMenu->tBox[0].text[i] = w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol].tileID[i];
+                }
+            }
         }
     }
 
-    drawTileAttr(w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol], 0, 0);
+    
 
     return EDITING;
 }
