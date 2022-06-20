@@ -232,6 +232,7 @@ bool initLevel(Level* l, char* id, int texIdx, int r, int c) {
         for (int i = 0; i < r; i++) {
             for (int j = 0; j < c; j++) {
                 l->tiles[i][j].tileID = (char*)malloc(sizeof(char) * MAX_TILE_ID_LEN);
+                for (int k = 0; k < MAX_TILE_ID_LEN; k++) l->tiles[i][j].tileID[k] = '\0';
                 for (int k = 0; k < 14; k++) l->tiles[i][j].attr[k] = 0;
                 l->tiles[i][j].attr[T_TEXTURE_IDX] = texIdx;
                 l->tiles[i][j].attr[T_ROW] = i;
@@ -430,14 +431,10 @@ BuildState editingLoop(Workspace* w, Menu* editContextMenu) {
 
         if (trVal == KEY_ENTER && editContextMenu->cursor == editContextMenu->numSel - 1) {
             w->editingTile = false;
-            // commit changes in menu to tile attr.
-            for (int i = 1; i < 15; i++) {
-                w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol].attr[i - 1] = editContextMenu->menuVals[i];
-            }
-
-            for (int i = 0; i < MAX_TILE_ID_LEN; i++) {
-                w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol].tileID[i] = editContextMenu->tBox[0].text[i];
-            }
+            
+            for (int i = 1; i < 15; i++) w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol].attr[i - 1] = editContextMenu->menuVals[i];
+            for (int i = 0; i < MAX_TILE_ID_LEN; i++) w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol].tileID[i] = editContextMenu->tBox[0].text[i];
+            resetMenu(editContextMenu);
         } else if (editContextMenu->cursor == T_TEXTURE_IDX + 1) {
             if (editContextMenu->menuVals[T_TEXTURE_IDX + 1] > w->numTileTex - 1) {
                 editContextMenu->menuVals[T_TEXTURE_IDX + 1] = w->numTileTex - 1;
