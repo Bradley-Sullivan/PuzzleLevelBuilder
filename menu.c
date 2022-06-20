@@ -25,10 +25,13 @@ void initMenu(Menu *m, int numSel, int initCursor, int selFontSize, char sel[][M
         m->tBox = (TextBox*)malloc(sizeof(TextBox) * numSel);
         for (int i = 0; i < numSel; i++) {
             if (m->menuTypes[i] == TEXT_ENTRY) {
-
-                // insert a different tBox initialization for context menus
-
-                initTextBox(&m->tBox[i], 10, m->selFS, 0, EDIT_WIDTH - (m->selFS * 11), ((i + 1) * m->selFS));
+                if (isContextMenu) {
+                    int xOff = (EDIT_WIDTH / 2) + getLongSelSize(m);
+                    initTextBox(&m->tBox[i], 10, m->selFS, 0, xOff, EDIT_HEIGHT / 2 - 5);
+                } else {
+                    int xOff = EDIT_WIDTH + getLongSelSize(m);
+                    initTextBox(&m->tBox[i], 10, m->selFS, 0, xOff, ((i + 1) * m->selFS) - 5);
+                }
             }
         }
     }
@@ -63,16 +66,22 @@ void initTextBox(TextBox* t, int editDisplayWidth, int fontSize, int initCursor,
 
 void drawMenu(Menu* m) {
     int begOffset, yOffset;
+    int identSelSize = getLongSelSize(m) + 50;
     char buf[8];
 
     if (m->isContextMenu) {
-        begOffset = WINDOW_WIDTH / 2;
+        begOffset = (EDIT_WIDTH / 2) + 50;
+        DrawRectangle((EDIT_WIDTH / 2) + 40, (EDIT_HEIGHT / 2) - 10, identSelSize + 50, m->numSel * m->selFS + 20, (Color){25, 25, 25, 250});
+        DrawText(">", begOffset - MeasureText(">", m->selFS), (m->cursor * m->selFS) + (WINDOW_HEIGHT / 2), m->selFS, RAYWHITE);
     } else {
         begOffset = EDIT_WIDTH + 2 * m->selFS;
+        DrawText(">", EDIT_WIDTH + m->selFS, m->selFS + (m->cursor * m->selFS), m->selFS, RAYWHITE);
     }
 
 
     for (int i = 0; i < m->numSel; i++) {
+        int curSelSize = MeasureText(m->sel[i], m->selFS);
+        int identWidth = curSelSize + (identSelSize - curSelSize);
 
         if (m->isContextMenu) {
             yOffset = (WINDOW_HEIGHT / 2) + (i * m->selFS);
@@ -83,36 +92,33 @@ void drawMenu(Menu* m) {
         switch (m->menuTypes[i]) {
             case SIMPLE_MENU:
                 DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
-                DrawText(">", EDIT_WIDTH + m->selFS, m->selFS + (m->cursor * m->selFS), m->selFS, RAYWHITE);
                 break;
             case PLUS_MINUS_MENU:
                 DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
                 sprintf(buf, "- %d +", m->menuVals[i]);
-                DrawText(buf, begOffset + 10 + MeasureText(m->sel[i], m->selFS), yOffset, m->selFS, RAYWHITE);
-                DrawText(">", EDIT_WIDTH + m->selFS, m->selFS + (m->cursor * m->selFS), m->selFS, RAYWHITE);
+                DrawText(buf, begOffset + identWidth, yOffset, m->selFS, RAYWHITE);
                 break;
             case CHECKLIST_MENU:
                 DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
                 if (m->menuVals[i]) {
-                    DrawText("[x]", begOffset + 50 + MeasureText(m->sel[i], m->selFS), yOffset, m->selFS, RAYWHITE);
+                    DrawText("[x]", begOffset + identWidth, yOffset, m->selFS, RAYWHITE);
                 } else {
-                    DrawText("[ ]", begOffset + 50 + MeasureText(m->sel[i], m->selFS), yOffset, m->selFS, RAYWHITE);
+                    DrawText("[ ]", begOffset + identWidth, yOffset, m->selFS, RAYWHITE);
                 }
-                DrawText(">", EDIT_WIDTH + m->selFS, m->selFS + (m->cursor * m->selFS), m->selFS, RAYWHITE);
                 break;
             case TEXT_ENTRY:
                 DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
                 drawTextBox(&m->tBox[i], m->tBox[i].editing);
-                DrawText(">", EDIT_WIDTH + m->selFS, m->selFS + (m->cursor * m->selFS), m->selFS, RAYWHITE);
                 break;
             case DISPLAY_VAL:
                 DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
                 sprintf(buf, "%d", m->menuVals[i]);
-                DrawText(buf, begOffset + 50 + MeasureText(m->sel[i], m->selFS), yOffset, m->selFS, RAYWHITE);
+                DrawText(buf, begOffset + identWidth, yOffset, m->selFS, RAYWHITE);
                 break;
             default:
                 break;
         }
+
     }
 }
 
@@ -130,99 +136,91 @@ void drawTextBox(TextBox* t, bool active) {
     } else {
         DrawRectangleRec(t->background, (Color){245, 245, 245, 150});
         DrawRectangleRec(t->editBox, (Color){10, 10, 10, 150});
-        DrawText(t->text, t->posX + 1, t->posY, t->fontSize, (Color){245, 245, 245, 150});
+
+        if (t->cursor > t->maxDispWidth) {
+            DrawText(TextSubtext(t->text, t->cursor - t->maxDispWidth, t->maxLen), t->posX + 1, t->posY, t->fontSize, (Color){245, 245, 245, 150});
+        } else {
+            DrawText(t->text, t->posX + 1, t->posY, t->fontSize, (Color){245, 245, 245, 150});
+        }
     }
 }
 
 int traverseMenu(Menu* m, int menuType) {
+    static float tBuf;
+    tBuf += GetFrameTime();
+
     int retVal = -1;
+
 
     switch (menuType) {
         case SIMPLE_MENU:
-            switch (GetKeyPressed()) {
-                case KEY_UP:
-                    m->cursor = (m->cursor == 0) ? m->numSel - 1 : m->cursor - 1;
-                    retVal = -1;
-                    break;
-                case KEY_DOWN:
-                    m->cursor = (m->cursor + 1) % m->numSel;
-                    retVal = -1;
-                    break;
-                case KEY_ENTER:
-                    retVal = KEY_ENTER;
-                    break;
-                case KEY_SPACE:
-                    retVal = KEY_SPACE;
-                    break;
-                default:
-                    break;
+            if (IsKeyPressed(KEY_UP)) {
+                m->cursor = (m->cursor == 0) ? m->numSel - 1 : m->cursor - 1;
+                retVal = -1;
+            } else if (IsKeyPressed(KEY_DOWN)) {
+                m->cursor = (m->cursor + 1) % m->numSel;
+                retVal = -1;
+            } else if (IsKeyDown(KEY_ENTER)) {
+                retVal = KEY_ENTER;
+            } else if (IsKeyDown(KEY_SPACE)) {
+                retVal = KEY_SPACE;
             }
             break;
         case PLUS_MINUS_MENU:
-            switch (GetKeyPressed()) {
-                case KEY_UP:
-                    m->cursor = (m->cursor == 0) ? m->numSel - 1 : m->cursor - 1;
-                    retVal = -1;
-                    break;
-                case KEY_DOWN:
-                    m->cursor = (m->cursor + 1) % m->numSel;
-                    retVal = -1;
-                    break;
-                case KEY_LEFT:
-                    m->menuVals[m->cursor] -= 1;
-                    retVal = KEY_LEFT;
-                    break;
-                case KEY_RIGHT:
-                    m->menuVals[m->cursor] += 1;
-                    retVal = KEY_RIGHT;
-                    break;
-                default:
-                    retVal = -1;
-                    break;
+            if (IsKeyPressed(KEY_UP)) {
+                m->cursor = (m->cursor == 0) ? m->numSel - 1 : m->cursor - 1;
+                retVal = -1;
+            } else if (IsKeyPressed(KEY_DOWN)) {
+                m->cursor = (m->cursor + 1) % m->numSel;
+                retVal = -1;
+            } else if (IsKeyDown(KEY_LEFT) && tBuf > 0.1f) {
+                m->menuVals[m->cursor] -= 1;
+                retVal = KEY_LEFT;
+                tBuf = 0.0f;
+            } else if (IsKeyDown(KEY_RIGHT) && tBuf > 0.1f) {
+                m->menuVals[m->cursor] += 1;
+                retVal = KEY_RIGHT;
+                tBuf = 0.0f;
             }
             break;
         case CHECKLIST_MENU:
-            switch(GetKeyPressed()) {
-                case KEY_UP:
-                    m->cursor = (m->cursor == 0) ? m->numSel - 1 : m->cursor - 1;
-                    retVal = -1;
-                    break;
-                case KEY_DOWN:
-                    m->cursor = (m->cursor + 1) % m->numSel;
-                    retVal = -1;
-                    break;
-                case KEY_SPACE:
-                    m->menuVals[m->cursor] = (m->menuVals[m->cursor] == 0) ? 1 : 0;
-                    retVal = KEY_SPACE;
-                    break;
-                default:
-                    break;
+            if (IsKeyPressed(KEY_UP)) {
+                m->cursor = (m->cursor == 0) ? m->numSel - 1 : m->cursor - 1;
+                retVal = -1;
+            } else if (IsKeyPressed(KEY_DOWN)) {
+                m->cursor = (m->cursor + 1) % m->numSel;
+                retVal = -1;
+            } else if (IsKeyPressed(KEY_SPACE)) {
+                m->menuVals[m->cursor] = (m->menuVals[m->cursor] == 0) ? 1 : 0;
+                retVal = KEY_SPACE;
             }
             break;
         case TEXT_ENTRY:
             if (!m->tBox[m->cursor].editing) {
-                switch (GetKeyPressed()) {
-                    case KEY_UP:
-                        m->cursor = (m->cursor == 0) ? m->numSel - 1 : m->cursor - 1;
-                        retVal = -1;
-                        break;
-                    case KEY_DOWN:
-                        m->cursor = (m->cursor + 1) % m->numSel;
-                        retVal = -1;
-                        break;
-                    case KEY_ENTER:
-                        if (!m->tBox[m->cursor].editing) {
-                            m->tBox[m->cursor].editing = true;
-                        }
-                        break;
+                if (IsKeyPressed(KEY_UP)) {
+                    m->cursor = (m->cursor == 0) ? m->numSel - 1 : m->cursor - 1;
+                    retVal = -1;
+                } else if (IsKeyPressed(KEY_DOWN)) {
+                    m->cursor = (m->cursor + 1) % m->numSel;
+                    retVal = -1;
+                } else if (IsKeyPressed(KEY_ENTER)) {
+                    m->tBox[m->cursor].editing = true;
                 }
             } else {
                 editTextBox(&m->tBox[m->cursor]);
             }            
-            break;
+            break;            
         default:
+            if (IsKeyPressed(KEY_UP)) {
+                m->cursor = (m->cursor == 0) ? m->numSel - 1 : m->cursor - 1;
+                retVal = -1;
+            } else if (IsKeyPressed(KEY_DOWN)) {
+                m->cursor = (m->cursor + 1) % m->numSel;
+                retVal = -1;
+            }
             break;
     }
+    
 
     return retVal;
 }
@@ -231,7 +229,7 @@ bool editTextBox(TextBox* t) {
     int key = GetCharPressed();
 
     if (t->cursor < t->maxLen - 1 && key != 0) {
-        t->text[t->cursor] = key;
+        t->text[t->cursor] = (char)key;
         t->cursor += 1;
     }
 
@@ -273,4 +271,23 @@ bool editTextBox(TextBox* t) {
     }
 
     return true;
+}
+
+int getLongestSel(Menu* m) {
+    int maxLen = 0, maxIdx = 0;
+
+    for (int i = 0; i < m->numSel; i++) {
+        if (MeasureText(m->sel[i], m->selFS) > maxLen || maxLen == 0) {
+            maxLen = MeasureText(m->sel[i], m->selFS);
+            maxIdx = i;
+        }
+    }
+
+    return maxIdx;
+}
+
+int getLongSelSize(Menu* m) {
+    int maxSelIdx = getLongestSel(m);
+
+    return MeasureText(m->sel[maxSelIdx], m->selFS);
 }
