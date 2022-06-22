@@ -25,10 +25,12 @@
 #define MAX_NUM_LEVELS     128
 #define MAX_LEVEL_ROWS     64
 #define MAX_LEVEL_COLS     64
+#define MAX_NUM_ENTITIES   256
 
 #define MAX_NUM_TEX        128
 #define MAX_FILENAME_LEN   64
 #define MAX_TILE_ID_LEN    16
+#define MAX_ENT_ID_LEN     16
 
 #define T_PLAYER_COLL       0   // has player collision
 #define T_ENTITY_COLL       1   // has entity collision
@@ -61,6 +63,7 @@
 #define E_TEXTURE_IDX       13  // texture to be drawn passively (i.e. by default)  
 #define E_ACTIVE_TEX_IDX    14  // texture to be drawn on true active state
 #define E_TRIGGER_CH        15  // default trigger channel -> -1
-#define E_POS_X             16  // entity x-position
-#define E_POS_Y             17  // entity y-position
+#define E_POS_X             16  // entity x-position (top-left of ent. with respect to the top-leftmost corner of level)
+#define E_POS_Y             17  // entity y-position (top-left of ent. with respect to the top-leftmost corner of level)
 #define E_MOVE_SPEED        18  // entity moving step value    
+#define E_ANIM_PERIOD       19  // animation period in millis
