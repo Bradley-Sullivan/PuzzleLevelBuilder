@@ -15,6 +15,10 @@
 #include "include/raylib.h"
 #include "param.h"
 
+#define MAIN_MENU_FS        30
+#define SUB_MENU_FS         20
+#define CONTEXT_MENU_FS     15
+
 #define MAX_MENU_LEN        64
 #define MAX_TEXT_ENTRY_LEN  64
 #define MAX_LEVEL_ID_LEN    16
@@ -65,7 +69,6 @@ void initTextBox(TextBox* t, int editDisplayWidth, int fontSize, int initCursor,
 
 // add reset/clear functions for menu and tboxes
 void resetMenu(Menu* m);
-
 void clearTextBox(TextBox* t);
 
 void drawMenu(Menu* m);
