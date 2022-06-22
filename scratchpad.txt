@@ -116,5 +116,15 @@ Better Menuing System??
         + Use very basic, general menu structs with specialized processing functions
           within menu contexts.
             - Differentiate menu types with menu ID
+
+
+Tool Menu Ideas 
+    + Search by TileID
+    + Search by Tile attr.
+    + Batch Edit
+    + Batch Reset
+    + Resize Level
+    + Create Level Preset
+    + Duplicate Level
             
             
