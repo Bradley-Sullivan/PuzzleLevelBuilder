@@ -53,91 +53,23 @@
     entity array ??
 */
 
-typedef struct Tile {
-    char* tileID;
-    
-    int numEnts;            // editor only attribute used for hashing
-    int attr[14];           // tile's attributes
-} Tile;
-
-typedef struct Entity {
-    char* entityID;              // entity identifier used for quickly handling entity-related events?
-
-    int attr[20];
-
-    Texture2D* animFrames;
-
-    Rectangle collisionRec;     // entity "hitbox" used for judging collisions
-} Entity;
-
-typedef struct Level {
-    char* levelID;
-
-    bool initialized;
-
-    int numRows;
-    int numCols;
-    int baseFloorTexIndex;
-
-    Tile** tiles;
-    Entity* ents;
-} Level;
-
-typedef struct Workspace {
-    Level levels[MAX_NUM_LEVELS];
-
-    bool editingTile;
-    bool editingEntity;
-
-    int activeEditLevel;
-    int nextNewLevel;
-
-    int numTileTex;
-    int numEntityTex;
-    int numOtherTex;
-
-    int cursorRow;
-    int cursorCol;
-
-    Texture2D* tileTex;
-    Texture2D* entityTex;
-    Texture2D* otherTex;
-
-    Texture2D cursorTex;
-
-} Workspace;
-
-typedef enum BuildState {
-    MAIN_MENU,
-    NEW_LEVEL,
-    LOAD_LEVEL,
-    SWITCH_LEVEL,
-    EDITING,
-    SAVE_EXPORT,
-    HELP,
-    EXIT
-} BuildState;
-
-typedef enum TexType {
-    TILE_TEX,
-    ENTITY_TEX,
-    OTHER_TEX
-} TexType;
-
 void initWorkspace(Workspace* w);
 
 bool initLevel(Level* l, char* id, int texIdx, int r, int c);
 void previewTextures(Workspace* w, int tex, TexType type);
 bool loadTextures(Workspace* w);
 int loadTexHelper(Texture2D dest[], char* dir);
-int entIdxHash(int row, int col);
+int getEntIdx(Level* l, char* id, int row, int col);
+int getNumEntCollisions(Level* l, int row, int col);
+bool getEntCollisionIDs(Level* l, char** ids, int row, int col);
 
 void renderWorkspace(Workspace* w);
 void drawTileAttr(Tile t, double x, double y);
 
 int editSelect();
+int entityCollisionSelect(char** entityIDs, int numCollisions);
 void tileEdit(Workspace* w, Menu* editTileContextMenu);
-void entityEdit(Workspace* w, Menu* editEntityContextMenu);
+void entityEdit(Workspace* w, Menu* editEntityContextMenu, bool newEntity);
 
 BuildState mainMenuScreen(Menu* m);
 BuildState levelInitConfig(Menu* m, Workspace* w);
@@ -163,27 +95,27 @@ int main(void) {
     int levelConfMenuTypes[5] = {TEXT_ENTRY, PLUS_MINUS_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU, SIMPLE_MENU};
     initMenu(&levelConfMenu, 5, 0, SUB_MENU_FS, levelConfMenuSel, levelConfMenuTypes, false);
 
-    char editTileContextMenuSel[16][MAX_MENU_LEN] = {"TileID", "Player Coll.", "Entity Coll.", "Proj. Coll.", 
+    char editTileContextMenuSel[T_NUM_ATTR + 2][MAX_MENU_LEN] = {"TileID", "Player Coll.", "Entity Coll.", "Proj. Coll.", 
                                                 "Moveable", "Player Spawn", "Entity Spawn", "Level End", 
                                                 "Teleporter", "1-Way Tele.", "Tex. Index", "Row Pos.", 
                                                 "Col Pos.", "Entity Sp. Channel", "Tele Channel", "CONFIRM"};
-    int editTileContextMenuTypes[16] = {TEXT_ENTRY, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, 
+    int editTileContextMenuTypes[T_NUM_ATTR + 2] = {TEXT_ENTRY, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, 
                                     CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, 
                                     CHECKLIST_MENU, CHECKLIST_MENU, PLUS_MINUS_MENU, DISPLAY_VAL, 
                                     DISPLAY_VAL, PLUS_MINUS_MENU, PLUS_MINUS_MENU, SIMPLE_MENU};
-    initMenu(&editTileContextMenu, 16, 0, CONTEXT_MENU_FS, editTileContextMenuSel, editTileContextMenuTypes, true);
+    initMenu(&editTileContextMenu, T_NUM_ATTR + 2, 0, CONTEXT_MENU_FS, editTileContextMenuSel, editTileContextMenuTypes, true);
 
-    char editEntityContextMenuSel[22][MAX_MENU_LEN] = {"EntityID", "Hostile", "Passive", "Active", "Trigger Head",
+    char editEntityContextMenuSel[E_NUM_ATTR + 2][MAX_MENU_LEN] = {"EntityID", "Hostile", "Passive", "Active", "Trigger Head",
                                                     "Is Textured", "Player Coll.", "Entity Coll.", "Proj. Coll.",
                                                     "Active Interact", "Passive Interact", "Effect Magnitude", "X Dir.",
                                                     "Y Dir.", "Tex. Index", "Active Tex. Index", "Trigger Channel", 
                                                     "X Position", "Y Position", "Move Speed", "Anim. Period", "CONFIRM"};
-    int editEntityContextMenuTypes[22] = {TEXT_ENTRY, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU,
+    int editEntityContextMenuTypes[E_NUM_ATTR + 2] = {TEXT_ENTRY, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU,
                                         CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU,
                                         CHECKLIST_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU,
                                         PLUS_MINUS_MENU, PLUS_MINUS_MENU, DISPLAY_VAL, DISPLAY_VAL, PLUS_MINUS_MENU,
                                         PLUS_MINUS_MENU, SIMPLE_MENU};
-    initMenu(&editEntityContextMenu, 22, 0, CONTEXT_MENU_FS, editEntityContextMenuSel, editEntityContextMenuTypes, true);
+    initMenu(&editEntityContextMenu, E_NUM_ATTR + 2, 0, CONTEXT_MENU_FS, editEntityContextMenuSel, editEntityContextMenuTypes, true);
 
     char editSubMenuSel[5][MAX_MENU_LEN] = {"TOOLS", "SWITCH LEVEL", "SAVE", "SAVE & EXIT", "QUIT"};
     int editSubMenuTypes[5] = {SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU};
@@ -226,8 +158,11 @@ void initWorkspace(Workspace* w) {
 
     w->editingTile = false;
     w->editingEntity = false;
+    w->entityEditCollision = false;
+    w->editingNewEntity = false;
     w->activeEditLevel = 0;
     w->nextNewLevel = 0;
+    w->editingEntityIdx = -1;
     w->cursorCol = 0;
     w->cursorRow = 0;
 
@@ -256,8 +191,10 @@ bool initLevel(Level* l, char* id, int texIdx, int r, int c) {
 
         l->ents = (Entity*)malloc(sizeof(Entity) * MAX_NUM_ENTITIES);
         for (int i = 0; i < MAX_NUM_ENTITIES; i++) {
-            for (int k = 0; k < 20; k++) l->ents[i].attr[k] = 0;
+            l->ents[i].existsInWorkspace = false;
+            for (int k = 0; k < E_NUM_ATTR; k++) l->ents[i].attr[k] = 0;
             l->ents[i].entityID = (char*)malloc(sizeof(char) * MAX_ENT_ID_LEN);
+            for (int k = 0; k < MAX_ENT_ID_LEN; k++) l->ents[i].entityID[k] = '\0';
         }
 
         l->tiles = (Tile**)malloc(sizeof(Tile*) * r);
@@ -269,12 +206,14 @@ bool initLevel(Level* l, char* id, int texIdx, int r, int c) {
             for (int j = 0; j < c; j++) {
                 l->tiles[i][j].tileID = (char*)malloc(sizeof(char) * MAX_TILE_ID_LEN);
                 for (int k = 0; k < MAX_TILE_ID_LEN; k++) l->tiles[i][j].tileID[k] = '\0';
-                for (int k = 0; k < 14; k++) l->tiles[i][j].attr[k] = 0;
+                for (int k = 0; k < T_NUM_ATTR; k++) l->tiles[i][j].attr[k] = 0;
                 l->tiles[i][j].attr[T_TEXTURE_IDX] = texIdx;
                 l->tiles[i][j].attr[T_ROW] = i;
                 l->tiles[i][j].attr[T_COL] = j;
             }
         }
+        
+        l->nextFreeEnt = 0;
 
         l->initialized = true;
 
@@ -290,11 +229,11 @@ bool initLevel(Level* l, char* id, int texIdx, int r, int c) {
 void previewTextures(Workspace* w, int tex, TexType type) {
     int xOffset, yOffset;
     
-    DrawRectangle((TILE_PIX_WIDTH + 20) * (tex + 1) - 5, (TILE_PIX_HEIGHT + 10) * ((tex + 5) / 5) - 5, TILE_PIX_WIDTH + 10, TILE_PIX_HEIGHT + 10, RED);
+    DrawRectangle((TILE_PIX_WIDTH + 20) * ((tex % 5) + 1) - 5, (TILE_PIX_HEIGHT + 10) * ((tex + 5) / 5) - 5, TILE_PIX_WIDTH + 10, TILE_PIX_HEIGHT + 10, RED);
 
     if (type == TILE_TEX) {
         for (int i = 0; i < w->numTileTex; i++) {
-            xOffset = (TILE_PIX_WIDTH + 20) * (i + 1);
+            xOffset = (TILE_PIX_WIDTH + 20) * ((i % 5) + 1);
             yOffset = (TILE_PIX_HEIGHT + 10) * ((i + 5) / 5);
             DrawTexture(w->tileTex[i], xOffset, yOffset, WHITE);
         }
@@ -350,7 +289,8 @@ int loadTexHelper(Texture2D dest[], char* dir) {
     for (int i = 0; i < MAX_NUM_TEX; i++) {
         texNames[i] = (char*)malloc(sizeof(char) * MAX_FILENAME_LEN);
     }
-    texNames = GetDirectoryFiles(dir, &numTex);
+    // texNames = GetDirectoryFiles(dir, &numTex);
+    texNames = LoadDirectoryFiles(dir, &numTex);
     ChangeDirectory(dir);
 
     for (int i = 0; i < numTex; i++) {
@@ -360,13 +300,62 @@ int loadTexHelper(Texture2D dest[], char* dir) {
         }
     }
 
-    ClearDirectoryFiles();
+    // ClearDirectoryFiles();
+    UnloadDirectoryFiles();
 
     return curTex;
 }
 
-int entIdxHash(int row, int col) {
-    return 0;
+int getEntIdx(Level* l, char* id, int row, int col) {
+    for (int i = 0; i < MAX_NUM_ENTITIES; i++) {
+        if (l->ents[i].existsInWorkspace) {
+            if (l->ents[i].attr[E_POS_X] / TILE_PIX_WIDTH == col) {
+                if (l->ents[i].attr[E_POS_Y] / TILE_PIX_HEIGHT == row) {
+                    if (strcmp(id, l->ents[i].entityID) == 0) {
+                        return i;
+                    }
+                }
+            }
+        }
+        
+    }
+
+    return -1;
+}
+
+int getNumEntCollisions(Level* l, int row, int col) {
+    int entCollisionCt = 0;
+    for (int i = 0; i < MAX_NUM_ENTITIES; i++) {
+        if (l->ents[i].existsInWorkspace) {
+            if (l->ents[i].attr[E_POS_X] / TILE_PIX_WIDTH == col) {
+                if (l->ents[i].attr[E_POS_Y] / TILE_PIX_HEIGHT == row) {
+                    entCollisionCt++;
+                }
+            }
+        }        
+    }
+
+    return entCollisionCt;
+}
+
+bool getEntCollisionIDs(Level* l, char** ids, int row, int col) {
+    int entCollisionCt = 0;
+    for (int i = 0; i < MAX_NUM_ENTITIES; i++) {
+        if (l->ents[i].existsInWorkspace) {
+            if (l->ents[i].attr[E_POS_X] / TILE_PIX_WIDTH == col) {
+                if (l->ents[i].attr[E_POS_Y] / TILE_PIX_HEIGHT == row) {
+                    strcpy(ids[entCollisionCt], l->ents[i].entityID);
+                    entCollisionCt++;
+                }
+            }
+        }        
+    }
+
+    if (entCollisionCt > 0) {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 void renderWorkspace(Workspace* w) {
@@ -393,11 +382,13 @@ void renderWorkspace(Workspace* w) {
             int entTex = w->levels[w->activeEditLevel].ents[i].attr[E_TEXTURE_IDX];
             int xPos = w->levels[w->activeEditLevel].ents[i].attr[E_POS_X];
             int yPos = w->levels[w->activeEditLevel].ents[i].attr[E_POS_Y];
-            int gridX = xPos / w->levels[w->activeEditLevel].numCols;
-            int gridY = yPos / w->levels[w->activeEditLevel].numRows;
-            int xOffset = (EDIT_WIDTH / 2) - ((w->cursorCol - gridX) * TILE_PIX_WIDTH) - (TILE_PIX_WIDTH / 2);
-            int yOffset = (EDIT_WIDTH / 2) - ((w->cursorRow - gridY) * TILE_PIX_HEIGHT) - (TILE_PIX_HEIGHT / 2);
-            DrawTexture(w->entityTex[entTex], xOffset, yOffset, RAYWHITE);
+            int gridX = xPos / TILE_PIX_WIDTH;
+            int gridY = yPos / TILE_PIX_HEIGHT;
+            double xOffset = (EDIT_WIDTH / 2) - ((w->cursorCol - gridX) * TILE_PIX_WIDTH) - (TILE_PIX_WIDTH / 2);
+            double yOffset = (EDIT_HEIGHT / 2) - ((w->cursorRow - gridY) * TILE_PIX_HEIGHT) - (TILE_PIX_HEIGHT / 2);
+            if (xOffset < EDIT_WIDTH - (TILE_PIX_WIDTH / 2)) {
+                DrawTexture(w->entityTex[entTex], xOffset, yOffset, RAYWHITE);
+            }
         }
     }
 
@@ -432,7 +423,7 @@ void drawTileAttr(Tile t, double x, double y) {
 int editSelect() {
     static bool isInit = false;
     static Menu editSelectionMenu;
-    static char editSelectionSel[3][MAX_MENU_LEN] = {"Edit Entity", "Edit Tile", "BACK"};
+    static char editSelectionSel[3][MAX_MENU_LEN] = {"Edit/Add Entity", "Edit Tile", "BACK"};
     static int editSelectionTypes[3] = {SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU};
     if (!isInit) {
         initMenu(&editSelectionMenu, 3, 0, 15, editSelectionSel, editSelectionTypes, true);
@@ -445,7 +436,37 @@ int editSelect() {
         case KEY_ENTER:
             return editSelectionMenu.cursor;
         default:
-            return -1;
+            break;
+    }
+
+    return -1;
+}
+
+int entityCollisionSelect(char** entityIDs, int numCollisions) {
+    static bool isInit = false;
+    static Menu entityCollisionMenu;
+    static char entityCollisionMenuSel[MAX_NUM_ENTITIES][MAX_MENU_LEN];
+    static int entityCollisionMenuTypes[MAX_NUM_ENTITIES];
+
+    if (!isInit) {
+        for (int i = 0; i < numCollisions; i++) {
+            strncpy(entityCollisionMenuSel[i], entityIDs[i], MAX_ENT_ID_LEN);
+        }
+        strncpy(entityCollisionMenuSel[numCollisions], "Add Entity", MAX_MENU_LEN);
+        strncpy(entityCollisionMenuSel[numCollisions + 1], "BACK", MAX_MENU_LEN);
+        for (int i = 0; i < numCollisions + 2; i++) entityCollisionMenuTypes[i] = SIMPLE_MENU;
+        initMenu(&entityCollisionMenu, numCollisions + 2, 0, CONTEXT_MENU_FS, entityCollisionMenuSel, entityCollisionMenuTypes, true); 
+        isInit = true;
+    }
+
+    drawMenu(&entityCollisionMenu);
+
+    switch (traverseMenu(&entityCollisionMenu, entityCollisionMenu.menuTypes[entityCollisionMenu.cursor])) {
+        case KEY_ENTER:
+            isInit = false;
+            return entityCollisionMenu.cursor;
+        default:
+            break;
     }
 
     return -1;
@@ -472,20 +493,33 @@ void tileEdit(Workspace* w, Menu* editTileContextMenu) {
     }
 }
 
-void entityEdit(Workspace* w, Menu* editEntityContextMenu) {
+void entityEdit(Workspace* w, Menu* editEntityContextMenu, bool newEntity) {
     int trVal = traverseMenu(editEntityContextMenu, editEntityContextMenu->menuTypes[editEntityContextMenu->cursor]);
+    int entEditIndex;
+
     drawMenu(editEntityContextMenu);
 
+    // use newEntity boolean to switch between using level's next entity index and given 
+    // entity index to edit.
+
+    if (newEntity) {
+        // use active edit level's next new entity index to edit
+        entEditIndex = w->levels[w->activeEditLevel].nextFreeEnt;
+    } else {
+        // use workspaces edit entity index to edit
+        entEditIndex = w->editingEntityIdx;
+    }
+
     if (trVal == KEY_ENTER && editEntityContextMenu->cursor == editEntityContextMenu->numSel - 1) {
-        int r = w->cursorRow;
-        int c = w->cursorCol;
         w->editingEntity = false;
-        for (int i = 1; i < 20; i++) {
-            w->levels[w->activeEditLevel].ents[entIdxHash(r, c)].attr[i - 1] = editEntityContextMenu->menuVals[i];
+        for (int i = 1; i < E_NUM_ATTR; i++) {
+            w->levels[w->activeEditLevel].ents[entEditIndex].attr[i - 1] = editEntityContextMenu->menuVals[i];
         }
         for (int i = 0; i < MAX_TILE_ID_LEN; i++) {
-            w->levels[w->activeEditLevel].ents[entIdxHash(r, c)].entityID[i] = editEntityContextMenu->tBox[0].text[i];
+            w->levels[w->activeEditLevel].ents[entEditIndex].entityID[i] = editEntityContextMenu->tBox[0].text[i];
         }
+        w->levels[w->activeEditLevel].ents[entEditIndex].existsInWorkspace = true;
+        if (newEntity) w->levels[w->activeEditLevel].nextFreeEnt += 1;
         resetMenu(editEntityContextMenu);
     } else if (editEntityContextMenu->cursor == E_TEXTURE_IDX + 1) {
         if (editEntityContextMenu->menuVals[E_TEXTURE_IDX + 1] > w->numEntityTex - 1) {
@@ -586,6 +620,8 @@ BuildState editAltMenu(Menu* editSubMenu) {
 
 BuildState editingLoop(Workspace* w, Menu* editTileContextMenu, Menu* editEntityContextMenu, Menu* editSubMenu) {
     static bool editSelectSwitch = false;
+    static char** entityCollisionIDs;
+    static int numEntityCollisions;
 
     renderWorkspace(w);
 
@@ -595,15 +631,26 @@ BuildState editingLoop(Workspace* w, Menu* editTileContextMenu, Menu* editEntity
                 w->editingEntity = true;
                 editEntityContextMenu->cursor = 0;
 
-                // NOTE: Change ent indexing from 0 to use hashed value @ wkspc. cursor
-                // NOTE^2: Multiple entity detection will need to go here. Make sure to include an option for
-                // adding a NEW entity.
-                for (int i = 1; i < 20; i++) {
-                    editEntityContextMenu->menuVals[i] = w->levels[w->activeEditLevel].ents[0].attr[i - 1];
-                }
+                numEntityCollisions = getNumEntCollisions(&w->levels[w->activeEditLevel], w->cursorRow, w->cursorCol);
+                if (numEntityCollisions > 0) {
+                    entityCollisionIDs = (char**)malloc(sizeof(char*) * numEntityCollisions);
+                    for (int i = 0; i < numEntityCollisions; i++) entityCollisionIDs[i] = (char*)malloc(sizeof(char) * MAX_ENT_ID_LEN);
+                    if (getEntCollisionIDs(&w->levels[w->activeEditLevel], entityCollisionIDs, w->cursorRow, w->cursorCol)) {
+                        w->entityEditCollision = true;
+                    }
+                } else {
+                    w->entityEditCollision = false;
+                    w->editingNewEntity = true;
+                    int editEntityIdx = w->levels[w->activeEditLevel].nextFreeEnt;
+                    w->levels[w->activeEditLevel].ents[editEntityIdx].attr[E_POS_X] = TILE_PIX_HEIGHT * w->cursorRow;
+                    w->levels[w->activeEditLevel].ents[editEntityIdx].attr[E_POS_Y] = TILE_PIX_WIDTH * w->cursorCol;
+                    for (int i = 1; i < E_NUM_ATTR; i++) {
+                        editEntityContextMenu->menuVals[i] = w->levels[w->activeEditLevel].ents[editEntityIdx].attr[i - 1];
+                    }
 
-                for (int i = 0; i < MAX_ENT_ID_LEN; i++) {
-                    editEntityContextMenu->tBox[0].text[i] = w->levels[w->activeEditLevel].ents[0].entityID[i];
+                    for (int i = 0; i < MAX_ENT_ID_LEN; i++) {
+                        editEntityContextMenu->tBox[0].text[i] = w->levels[w->activeEditLevel].ents[editEntityIdx].entityID[i];
+                    }
                 }
 
                 editSelectSwitch = false;
@@ -611,7 +658,7 @@ BuildState editingLoop(Workspace* w, Menu* editTileContextMenu, Menu* editEntity
             case 1:
                 w->editingTile = true;
                 editTileContextMenu->cursor = 0;
-                for (int i = 1; i < 15; i++) {
+                for (int i = 1; i < T_NUM_ATTR; i++) {
                     editTileContextMenu->menuVals[i] = w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol].attr[i - 1];
                 }
                 for (int i = 0; i < MAX_TILE_ID_LEN; i++) {
@@ -629,11 +676,34 @@ BuildState editingLoop(Workspace* w, Menu* editTileContextMenu, Menu* editEntity
     } else if (w->editingTile) {
         tileEdit(w, editTileContextMenu);
     } else if (w->editingEntity) {
-        // NOTE: entityEdit function will need to accept some form
-        // of identification for multiple entities on a single tile.
-        // I.E need to know which ent index of wkspc. to update attr
-        // from context menu
-        entityEdit(w, editEntityContextMenu);
+        if (w->entityEditCollision) {
+            int selVal = entityCollisionSelect(entityCollisionIDs, numEntityCollisions);
+
+            if (selVal == numEntityCollisions) {
+                // adding entity
+                w->entityEditCollision = false;
+                w->editingNewEntity = true;
+            } else if (selVal == numEntityCollisions + 1) {
+                // back
+                w->entityEditCollision = false;
+                w->editingEntity = false;
+                editSelectSwitch = true;
+            } else if (selVal >= 0 && selVal < numEntityCollisions) {
+                w->editingEntityIdx = getEntIdx(&w->levels[w->activeEditLevel], entityCollisionIDs[selVal], w->cursorRow, w->cursorCol);
+                w->entityEditCollision = false;
+                w->editingNewEntity = false;
+
+                for (int i = 1; i < E_NUM_ATTR; i++) {
+                    editEntityContextMenu->menuVals[i] = w->levels[w->activeEditLevel].ents[w->editingEntityIdx].attr[i - 1];
+                }
+
+                for (int i = 0; i < MAX_ENT_ID_LEN; i++) {
+                    editEntityContextMenu->tBox[0].text[i] = w->levels[w->activeEditLevel].ents[w->editingEntityIdx].entityID[i];
+                }
+            }
+        } else {
+            entityEdit(w, editEntityContextMenu, w->editingNewEntity);
+        }
     } else if (IsKeyDown(KEY_LEFT_SHIFT)) {
         return editAltMenu(editSubMenu);
     } else {
