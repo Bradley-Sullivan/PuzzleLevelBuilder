@@ -1,12 +1,6 @@
 CC = gcc
 CFLAGS = -g -Wall
 
-# ifeq ($(UNAME), Linux)
-# 	CFLAGS += -O2 -std=c99 -Wno-missing-braces -Iinclude/ -Llib/ -lraylib -lglfw -lGL -lopenal -lm -pthread -ldl
-# else 
-# 	CFLAGS += -O1 -std=c99 -Wno-missing-braces -Iinclude/ -Llib/ -lm -lraylib -lopengl32 -lgdi32 -lwinmm
-# endif
-
 ifeq ($(OS),Windows_NT)
 	CFLAGS += -O1 -std=c99 -Wno-missing-braces -Iinclude/ -Llib/ -lm -lraylib -lopengl32 -lgdi32 -lwinmm
 else
