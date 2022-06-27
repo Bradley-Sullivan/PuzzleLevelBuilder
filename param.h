@@ -32,6 +32,9 @@
 #define MAX_TILE_ID_LEN    16
 #define MAX_ENT_ID_LEN     16
 
+#define T_NUM_ATTR          14
+#define E_NUM_ATTR          20
+
 #define T_PLAYER_COLL       0   // has player collision
 #define T_ENTITY_COLL       1   // has entity collision
 #define T_PROJ_COLL         2   // has proj. collision
@@ -67,3 +70,81 @@
 #define E_POS_Y             17  // entity y-position (top-left of ent. with respect to the top-leftmost corner of level)
 #define E_MOVE_SPEED        18  // entity moving step value    
 #define E_ANIM_PERIOD       19  // animation period in millis
+
+typedef struct Tile {
+    char* tileID;
+    
+    int numEnts;            // editor only attribute used for hashing
+    int attr[14];           // tile's attributes
+} Tile;
+
+typedef struct Entity {
+    char* entityID;              // entity identifier used for quickly handling entity-related events?
+
+    bool existsInWorkspace;
+
+    int attr[20];
+
+    Texture2D* animFrames;
+
+    Rectangle collisionRec;     // entity "hitbox" used for judging collisions
+} Entity;
+
+typedef struct Level {
+    char* levelID;
+
+    bool initialized;
+
+    int numRows;
+    int numCols;
+    int baseFloorTexIndex;
+    int nextFreeEnt;
+
+    Tile** tiles;
+    Entity* ents;
+} Level;
+
+typedef struct Workspace {
+    Level levels[MAX_NUM_LEVELS];
+
+    bool editingTile;
+    bool editingEntity;
+    bool entityEditCollision;
+    bool editingNewEntity;
+
+    int activeEditLevel;
+    int nextNewLevel;
+
+    int editingEntityIdx;
+
+    int numTileTex;
+    int numEntityTex;
+    int numOtherTex;
+
+    int cursorRow;
+    int cursorCol;
+
+    Texture2D* tileTex;
+    Texture2D* entityTex;
+    Texture2D* otherTex;
+
+    Texture2D cursorTex;
+
+} Workspace;
+
+typedef enum BuildState {
+    MAIN_MENU,
+    NEW_LEVEL,
+    LOAD_LEVEL,
+    SWITCH_LEVEL,
+    EDITING,
+    SAVE_EXPORT,
+    HELP,
+    EXIT
+} BuildState;
+
+typedef enum TexType {
+    TILE_TEX,
+    ENTITY_TEX,
+    OTHER_TEX
+} TexType;
