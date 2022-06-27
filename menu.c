@@ -178,9 +178,9 @@ int traverseMenu(Menu* m, int menuType) {
             } else if (IsKeyPressed(KEY_DOWN)) {
                 m->cursor = (m->cursor + 1) % m->numSel;
                 retVal = -1;
-            } else if (IsKeyDown(KEY_ENTER)) {
+            } else if (IsKeyPressed(KEY_ENTER)) {
                 retVal = KEY_ENTER;
-            } else if (IsKeyDown(KEY_SPACE)) {
+            } else if (IsKeyPressed(KEY_SPACE)) {
                 retVal = KEY_SPACE;
             }
             break;
