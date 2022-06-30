@@ -15,10 +15,10 @@
 #include <stdbool.h>
 #include <string.h>
 #include <raylib.h>
-// uncomment if Linux compilation is borked
-// #include "include/raylib.h"
 #include "menu.h"
 #include "param.h"
+#include "edit_ui.h"
+#include "draw.h"
 
 /*
     Need to figure out entity rendering and how changing entities
@@ -54,32 +54,31 @@
 */
 
 void initWorkspace(Workspace* w);
-
 bool initLevel(Level* l, char* id, int texIdx, int r, int c);
-void previewTextures(Workspace* w, int tex, TexType type);
 bool loadTextures(Workspace* w);
 int loadTexHelper(Texture2D dest[], char* dir);
+
 int getEntIdx(Level* l, char* id, int row, int col);
 int getNumEntCollisions(Level* l, int row, int col);
 bool getEntCollisionIDs(Level* l, char** ids, int row, int col);
+int listCurrentSaves();
 
-void renderWorkspace(Workspace* w);
-void drawTileAttr(Tile t, double x, double y);
-
-int editSelect();
-int entityCollisionSelect(char** entityIDs, int numCollisions);
-void tileEdit(Workspace* w, Menu* editTileContextMenu);
-void entityEdit(Workspace* w, Menu* editEntityContextMenu, bool newEntity);
+bool exportWorkspace(Workspace* w, char* filepath);
+bool exportLevels(Workspace* w, char* filepath);
+bool writeLevel(Level* l);
+bool writeEntities(Entity* e);
 
 BuildState mainMenuScreen(Menu* m);
 BuildState levelInitConfig(Menu* m, Workspace* w);
 BuildState editAltMenu(Menu* editSubMenu);
 BuildState editingLoop(Workspace* w, Menu* editTileContextMenu, Menu* editEntityContextMenu, Menu* editSubMenu);
+BuildState saveExportMenu(Workspace* w, Menu* m);
 
 int main(void) {
     Workspace editWorkspace;
     BuildState state = MAIN_MENU;
-    Menu mainMenu, levelConfMenu, editTileContextMenu, editEntityContextMenu, editSubMenu;
+    Menu mainMenu, levelConfMenu, editTileContextMenu 
+        ,editEntityContextMenu, editSubMenu, saveMenu;
 
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "test");
     ToggleFullscreen();
@@ -89,11 +88,11 @@ int main(void) {
 
     char mainMenuSel[4][MAX_MENU_LEN] = {"NEW", "LOAD", "HELP", "EXIT"};
     int mainMenuTypes[4] = {SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU};
-    initMenu(&mainMenu, 4, 0, MAIN_MENU_FS, mainMenuSel, mainMenuTypes, false);
+    initMenu(&mainMenu, 4, MAIN_MENU_FS, mainMenuSel, mainMenuTypes, false);
 
     char levelConfMenuSel[5][MAX_MENU_LEN] = {"Level ID", "Rows", "Columns", "Init Floor Tex.", "CONFIRM"};
     int levelConfMenuTypes[5] = {TEXT_ENTRY, PLUS_MINUS_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU, SIMPLE_MENU};
-    initMenu(&levelConfMenu, 5, 0, SUB_MENU_FS, levelConfMenuSel, levelConfMenuTypes, false);
+    initMenu(&levelConfMenu, 5, SUB_MENU_FS, levelConfMenuSel, levelConfMenuTypes, false);
 
     char editTileContextMenuSel[T_NUM_ATTR + 2][MAX_MENU_LEN] = {"TileID", "Player Coll.", "Entity Coll.", "Proj. Coll.", 
                                                 "Moveable", "Player Spawn", "Entity Spawn", "Level End", 
@@ -103,7 +102,7 @@ int main(void) {
                                     CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, 
                                     CHECKLIST_MENU, CHECKLIST_MENU, PLUS_MINUS_MENU, DISPLAY_VAL, 
                                     DISPLAY_VAL, PLUS_MINUS_MENU, PLUS_MINUS_MENU, SIMPLE_MENU};
-    initMenu(&editTileContextMenu, T_NUM_ATTR + 2, 0, CONTEXT_MENU_FS, editTileContextMenuSel, editTileContextMenuTypes, true);
+    initMenu(&editTileContextMenu, T_NUM_ATTR + 2, CONTEXT_MENU_FS, editTileContextMenuSel, editTileContextMenuTypes, true);
 
     char editEntityContextMenuSel[E_NUM_ATTR + 2][MAX_MENU_LEN] = {"EntityID", "Hostile", "Passive", "Active", "Trigger Head",
                                                     "Is Textured", "Player Coll.", "Entity Coll.", "Proj. Coll.",
@@ -115,11 +114,15 @@ int main(void) {
                                         CHECKLIST_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU,
                                         PLUS_MINUS_MENU, PLUS_MINUS_MENU, DISPLAY_VAL, DISPLAY_VAL, PLUS_MINUS_MENU,
                                         PLUS_MINUS_MENU, SIMPLE_MENU};
-    initMenu(&editEntityContextMenu, E_NUM_ATTR + 2, 0, CONTEXT_MENU_FS, editEntityContextMenuSel, editEntityContextMenuTypes, true);
+    initMenu(&editEntityContextMenu, E_NUM_ATTR + 2, CONTEXT_MENU_FS, editEntityContextMenuSel, editEntityContextMenuTypes, true);
 
     char editSubMenuSel[5][MAX_MENU_LEN] = {"TOOLS", "SWITCH LEVEL", "SAVE", "SAVE & EXIT", "QUIT"};
     int editSubMenuTypes[5] = {SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU};
-    initMenu(&editSubMenu, 5, 0, SUB_MENU_FS, editSubMenuSel, editSubMenuTypes, false);
+    initMenu(&editSubMenu, 5, SUB_MENU_FS, editSubMenuSel, editSubMenuTypes, false);
+
+    char saveMenuSel[4][MAX_MENU_LEN] = {"Save Level:", "Save Workspace:", "CONFIRM", "BACK"};
+    int saveMenuTypes[4] = {TEXT_ENTRY, TEXT_ENTRY, SIMPLE_MENU, SIMPLE_MENU};
+    initMenuRec(&saveMenu, 4, 25, saveMenuSel, saveMenuTypes, (Rectangle){25, WINDOW_HEIGHT - 185, 0, 0}, BLANK);
 
     while (!WindowShouldClose() && state != EXIT) {
         BeginDrawing();
@@ -140,6 +143,7 @@ int main(void) {
                     state = editingLoop(&editWorkspace, &editTileContextMenu, &editEntityContextMenu, &editSubMenu);
                     break;
                 case SAVE_EXPORT:
+                    state = saveExportMenu(&editWorkspace, &saveMenu);
                     break;
                 case HELP:
                     break;
@@ -226,33 +230,6 @@ bool initLevel(Level* l, char* id, int texIdx, int r, int c) {
     return true;
 }
 
-void previewTextures(Workspace* w, int tex, TexType type) {
-    int xOffset, yOffset;
-    
-    DrawRectangle((TILE_PIX_WIDTH + 20) * ((tex % 5) + 1) - 5, (TILE_PIX_HEIGHT + 10) * ((tex + 5) / 5) - 5, TILE_PIX_WIDTH + 10, TILE_PIX_HEIGHT + 10, RED);
-
-    if (type == TILE_TEX) {
-        for (int i = 0; i < w->numTileTex; i++) {
-            xOffset = (TILE_PIX_WIDTH + 20) * ((i % 5) + 1);
-            yOffset = (TILE_PIX_HEIGHT + 10) * ((i + 5) / 5);
-            DrawTexture(w->tileTex[i], xOffset, yOffset, WHITE);
-        }
-    } else if (type == ENTITY_TEX) {
-        for (int i = 0; i < w->numEntityTex; i++) {
-            xOffset = (TILE_PIX_WIDTH + 20) * (i + 1);
-            yOffset = (TILE_PIX_HEIGHT + 10) * ((i + 5) / 5);
-            DrawTexture(w->entityTex[i], xOffset, yOffset, WHITE);
-        }
-    } else if (type == OTHER_TEX) {
-        for (int i = 0; i < w->numOtherTex; i++) {
-            xOffset = (TILE_PIX_WIDTH + 20) * (i + 1);
-            yOffset = (TILE_PIX_HEIGHT + 10) * ((i + 5) / 5);
-            DrawTexture(w->otherTex[i], xOffset, yOffset, WHITE);
-        }
-    }
-    
-}
-
 bool loadTextures(Workspace* w) {
     const char* rootDir;
 
@@ -273,6 +250,7 @@ bool loadTextures(Workspace* w) {
     w->numEntityTex = loadTexHelper(w->entityTex, ENTITY_DIRECTORY);
     ChangeDirectory(rootDir);
     w->numOtherTex = loadTexHelper(w->otherTex, OTHER_DIRECTORY);
+    ChangeDirectory(rootDir);
 
     printf("%d tile textures loaded\n", w->numTileTex);
     printf("%d entity textures loaded\n", w->numEntityTex);
@@ -285,10 +263,6 @@ int loadTexHelper(Texture2D dest[], char* dir) {
     char** texNames;
     int numTex, curTex = 0;
 
-    texNames = (char**)malloc(sizeof(char*) * MAX_NUM_TEX);
-    for (int i = 0; i < MAX_NUM_TEX; i++) {
-        texNames[i] = (char*)malloc(sizeof(char) * MAX_FILENAME_LEN);
-    }
     // texNames = GetDirectoryFiles(dir, &numTex);
     texNames = LoadDirectoryFiles(dir, &numTex);
     ChangeDirectory(dir);
@@ -358,184 +332,97 @@ bool getEntCollisionIDs(Level* l, char** ids, int row, int col) {
     }
 }
 
-void renderWorkspace(Workspace* w) {
-    int rows = w->levels[w->activeEditLevel].numRows;
-    int cols = w->levels[w->activeEditLevel].numCols;
-    int xOffset, yOffset;
-    double curX = (EDIT_WIDTH / 2) - (TILE_PIX_WIDTH / 2);
-    double curY = (EDIT_HEIGHT / 2) - (TILE_PIX_HEIGHT / 2);
+int listCurrentSaves() {
+    static char** filenames;
+    static int numLevelSave, numWorkspaceSave;
 
-    for (int i = 0; i < rows; i++) {
-        for (int k = 0; k < cols; k++) {
-            xOffset = (EDIT_WIDTH / 2) - ((w->cursorCol - k) * TILE_PIX_WIDTH) - (TILE_PIX_WIDTH / 2);
-            yOffset = (EDIT_HEIGHT / 2) - ((w->cursorRow - i) * TILE_PIX_HEIGHT) - (TILE_PIX_HEIGHT / 2);
-            int tileTex = w->levels[w->activeEditLevel].tiles[i][k].attr[T_TEXTURE_IDX];
-            if (xOffset < EDIT_WIDTH - (TILE_PIX_WIDTH / 2)) {
-                DrawTexture(w->tileTex[tileTex], xOffset, yOffset, WHITE);
-                
-            }
+    DrawRectangle(15, 15, EDIT_WIDTH - 30, WINDOW_HEIGHT - 60, BLACK);
+
+    filenames = LoadDirectoryFiles(LEVEL_SAVE_PATH, &numLevelSave);
+    DrawText("SAVED LEVEL FILES", 25, 25, 25, RAYWHITE);
+    if (numLevelSave > 0) {
+        int xOffset = 50;
+        for (int i = 0; i < numLevelSave; i++) {
+            int yOffset = 25 * (i + 2);
+            DrawText(filenames[i], xOffset, yOffset, 25, RAYWHITE);
         }
-    }
-
-    for (int i = 0; i < w->numEntityTex; i++) {        
-        if (w->levels[w->activeEditLevel].ents[i].attr[E_IS_TEXTURED] == 1) {
-            int entTex = w->levels[w->activeEditLevel].ents[i].attr[E_TEXTURE_IDX];
-            int xPos = w->levels[w->activeEditLevel].ents[i].attr[E_POS_X];
-            int yPos = w->levels[w->activeEditLevel].ents[i].attr[E_POS_Y];
-            int gridX = xPos / TILE_PIX_WIDTH;
-            int gridY = yPos / TILE_PIX_HEIGHT;
-            double xOffset = (EDIT_WIDTH / 2) - ((w->cursorCol - gridX) * TILE_PIX_WIDTH) - (TILE_PIX_WIDTH / 2);
-            double yOffset = (EDIT_HEIGHT / 2) - ((w->cursorRow - gridY) * TILE_PIX_HEIGHT) - (TILE_PIX_HEIGHT / 2);
-            if (xOffset < EDIT_WIDTH - (TILE_PIX_WIDTH / 2)) {
-                DrawTexture(w->entityTex[entTex], xOffset, yOffset, RAYWHITE);
-            }
-        }
-    }
-
-    DrawTexture(w->cursorTex, curX, curY, WHITE);
-}
-
-void drawTileAttr(Tile t, double x, double y) {
-    static bool dispMenuInit = false;
-    static Menu dispMenu;
-    static char attr[15][MAX_MENU_LEN] = {"TileID", "Player Coll.", "Entity Coll.", "Proj. Coll.", 
-                                   "Moveable", "Player Spawn", "Entity Spawn", "Level End", 
-                                   "Teleporter", "1-Way Tele.", "Tex. Index", "Row Pos.", 
-                                   "Col Pos.", "Entity Sp. Channel", "Tele Channel"};
-    static int attrMenTypes[15] = {TEXT_ENTRY, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, 
-                            CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, 
-                            CHECKLIST_MENU, CHECKLIST_MENU, DISPLAY_VAL, DISPLAY_VAL, 
-                            DISPLAY_VAL, DISPLAY_VAL, DISPLAY_VAL};
-    if (!dispMenuInit) {
-        initMenu(&dispMenu, 15, 0, 20, attr, attrMenTypes, false);
-        dispMenuInit = true;
-    }
-
-    for (int i = 0; i < MAX_TEXT_ENTRY_LEN; i++) dispMenu.tBox[0].text[i] = t.tileID[i];
-
-    for (int i = 0; i < 14; i++) {
-        dispMenu.menuVals[i + 1] = t.attr[i];
-    }
-
-    drawMenu(&dispMenu);
-}
-
-int editSelect() {
-    static bool isInit = false;
-    static Menu editSelectionMenu;
-    static char editSelectionSel[3][MAX_MENU_LEN] = {"Edit/Add Entity", "Edit Tile", "BACK"};
-    static int editSelectionTypes[3] = {SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU};
-    if (!isInit) {
-        initMenu(&editSelectionMenu, 3, 0, 15, editSelectionSel, editSelectionTypes, true);
-        isInit = true;
-    }
-
-    drawMenu(&editSelectionMenu);
-
-    switch (traverseMenu(&editSelectionMenu, editSelectionMenu.menuTypes[editSelectionMenu.cursor])) {
-        case KEY_ENTER:
-            return editSelectionMenu.cursor;
-        default:
-            break;
-    }
-
-    return -1;
-}
-
-int entityCollisionSelect(char** entityIDs, int numCollisions) {
-    static bool isInit = false;
-    static Menu entityCollisionMenu;
-    static char entityCollisionMenuSel[MAX_NUM_ENTITIES][MAX_MENU_LEN];
-    static int entityCollisionMenuTypes[MAX_NUM_ENTITIES];
-
-    if (!isInit) {
-        for (int i = 0; i < numCollisions; i++) {
-            strncpy(entityCollisionMenuSel[i], entityIDs[i], MAX_ENT_ID_LEN);
-        }
-        strncpy(entityCollisionMenuSel[numCollisions], "Add Entity", MAX_MENU_LEN);
-        strncpy(entityCollisionMenuSel[numCollisions + 1], "BACK", MAX_MENU_LEN);
-        for (int i = 0; i < numCollisions + 2; i++) entityCollisionMenuTypes[i] = SIMPLE_MENU;
-        initMenu(&entityCollisionMenu, numCollisions + 2, 0, CONTEXT_MENU_FS, entityCollisionMenuSel, entityCollisionMenuTypes, true); 
-        isInit = true;
-    }
-
-    drawMenu(&entityCollisionMenu);
-
-    switch (traverseMenu(&entityCollisionMenu, entityCollisionMenu.menuTypes[entityCollisionMenu.cursor])) {
-        case KEY_ENTER:
-            isInit = false;
-            return entityCollisionMenu.cursor;
-        default:
-            break;
-    }
-
-    return -1;
-}
-
-void tileEdit(Workspace* w, Menu* editTileContextMenu) {
-    int trVal = traverseMenu(editTileContextMenu, editTileContextMenu->menuTypes[editTileContextMenu->cursor]);
-    drawMenu(editTileContextMenu);
-
-    if (trVal == KEY_ENTER && editTileContextMenu->cursor == editTileContextMenu->numSel - 1) {
-        w->editingTile = false;
-        
-        for (int i = 1; i < 15; i++) w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol].attr[i - 1] = editTileContextMenu->menuVals[i];
-        for (int i = 0; i < MAX_TILE_ID_LEN; i++) w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol].tileID[i] = editTileContextMenu->tBox[0].text[i];
-        resetMenu(editTileContextMenu);
-    } else if (editTileContextMenu->cursor == T_TEXTURE_IDX + 1) {
-
-        if (editTileContextMenu->menuVals[T_TEXTURE_IDX + 1] > w->numTileTex - 1) {
-            editTileContextMenu->menuVals[T_TEXTURE_IDX + 1] = w->numTileTex - 1;
-        } else if (editTileContextMenu->menuVals[T_TEXTURE_IDX + 1] < 0) {
-            editTileContextMenu->menuVals[T_TEXTURE_IDX + 1] = 0;
-        }
-        previewTextures(w, editTileContextMenu->menuVals[T_TEXTURE_IDX + 1], TILE_TEX);
-    }
-}
-
-void entityEdit(Workspace* w, Menu* editEntityContextMenu, bool newEntity) {
-    int trVal = traverseMenu(editEntityContextMenu, editEntityContextMenu->menuTypes[editEntityContextMenu->cursor]);
-    int entEditIndex;
-
-    drawMenu(editEntityContextMenu);
-
-    // use newEntity boolean to switch between using level's next entity index and given 
-    // entity index to edit.
-
-    if (newEntity) {
-        // use active edit level's next new entity index to edit
-        entEditIndex = w->levels[w->activeEditLevel].nextFreeEnt;
     } else {
-        // use workspaces edit entity index to edit
-        entEditIndex = w->editingEntityIdx;
+        DrawText("NO SAVED LEVELS", 50, 50, 25, RAYWHITE);
+    }
+    filenames = LoadDirectoryFiles(WKSPC_SAVE_PATH, &numWorkspaceSave);
+    DrawText("SAVED WORKSPACE FILES", 25, (numLevelSave + 2) * 25, 25, RAYWHITE);
+    if (numWorkspaceSave > 0) {
+        int xOffset = 50;
+        for (int i = 0; i < numWorkspaceSave; i++) {
+            int yOffset = 25 * (i + numLevelSave + 3);
+            DrawText(filenames[i], xOffset, yOffset, 25, RAYWHITE);
+        }
+    } else {
+        DrawText("NO SAVED WORKSPACES", 25, (numLevelSave + 2) * 25, 25, RAYWHITE);
     }
 
-    if (trVal == KEY_ENTER && editEntityContextMenu->cursor == editEntityContextMenu->numSel - 1) {
-        w->editingEntity = false;
-        for (int i = 1; i < E_NUM_ATTR; i++) {
-            w->levels[w->activeEditLevel].ents[entEditIndex].attr[i - 1] = editEntityContextMenu->menuVals[i];
+    UnloadDirectoryFiles();
+    return 0;
+}
+
+bool exportWorkspace(Workspace* w, char* filepath) {
+    FILE* fp;
+    fp = fopen(filepath, "w");
+    
+    return true;
+}
+
+bool exportLevels(Workspace* w, char* filepath) {
+    FILE* fp;
+    fp = fopen(filepath, "w");
+    
+    if (fp == NULL) {
+        printf("ERROR: Could not open path to file in order to export levels\nFILEPATH: %s\n", filepath);
+        return false;
+    } else {
+        for (int i = 0; i < w->nextNewLevel; i++) {   
+            fprintf(fp, ":%s,%d,%d:\n;", w->levels[i].levelID, w->levels[i].numRows, w->levels[i].numCols);
+            for (int k = 0; k < w->levels[i].numRows; k++) {
+                for (int j = 0; j < w->levels[i].numCols; j++) {
+                    char* printStr = (char*)malloc(sizeof(char) * (2 * T_NUM_ATTR * w->levels[i].numCols + MAX_TILE_ID_LEN));
+                    char* tileAttr = (char*)malloc(sizeof(char) * 2 * T_NUM_ATTR);
+                    sprintf(printStr, "%s,", w->levels[i].tiles[k][j].tileID);
+                    for (int l = 0; l < T_NUM_ATTR; l++) {
+                        sprintf(tileAttr, "%d", w->levels[i].tiles[k][j].attr[l]);
+                        if (l < T_NUM_ATTR - 1) {
+                            strcat(tileAttr, ",");
+                        } else {
+                            strcat(tileAttr, ";");
+                        }
+                        strcat(printStr, tileAttr);
+                    }
+                    fprintf(fp, "%s", printStr);
+                }
+            }
+            fprintf(fp, "\n;");
+            for (int k = 0; k < w->levels[i].nextFreeEnt; k++) {
+                char* printStr = (char*)malloc(sizeof(char) * (3 * E_NUM_ATTR + MAX_ENT_ID_LEN));
+                char* entityAttr = (char*)malloc(sizeof(char) * (2 * E_NUM_ATTR));
+                sprintf(printStr, "%s,", w->levels[i].ents[k].entityID);
+                for (int j = 0; j < E_NUM_ATTR; j++) {
+                    sprintf(entityAttr, "%d", w->levels[i].ents[k].attr[j]);
+                    if (j < E_NUM_ATTR - 1) {
+                        strcat(entityAttr, ",");
+                    } else {
+                        strcat(entityAttr, ";");
+                    }
+                    strcat(printStr, entityAttr);
+                }
+                fprintf(fp, "%s", printStr);
+            }
+            fprintf(fp, "\n\n");
         }
-        for (int i = 0; i < MAX_TILE_ID_LEN; i++) {
-            w->levels[w->activeEditLevel].ents[entEditIndex].entityID[i] = editEntityContextMenu->tBox[0].text[i];
-        }
-        w->levels[w->activeEditLevel].ents[entEditIndex].existsInWorkspace = true;
-        if (newEntity) w->levels[w->activeEditLevel].nextFreeEnt += 1;
-        resetMenu(editEntityContextMenu);
-    } else if (editEntityContextMenu->cursor == E_TEXTURE_IDX + 1) {
-        if (editEntityContextMenu->menuVals[E_TEXTURE_IDX + 1] > w->numEntityTex - 1) {
-            editEntityContextMenu->menuVals[E_TEXTURE_IDX + 1] = w->numEntityTex - 1;
-        } else if (editEntityContextMenu->menuVals[E_TEXTURE_IDX + 1] < 0) {
-            editEntityContextMenu->menuVals[E_TEXTURE_IDX + 1] = 0;
-        }
-        previewTextures(w, editEntityContextMenu->menuVals[E_TEXTURE_IDX + 1], ENTITY_TEX);
-    } else if (editEntityContextMenu->cursor == E_ACTIVE_TEX_IDX + 1) {
-        if (editEntityContextMenu->menuVals[E_ACTIVE_TEX_IDX + 1] > w->numEntityTex - 1) {
-            editEntityContextMenu->menuVals[E_ACTIVE_TEX_IDX + 1] = w->numEntityTex - 1;
-        } else if (editEntityContextMenu->menuVals[E_ACTIVE_TEX_IDX + 1] < 0) {
-            editEntityContextMenu->menuVals[E_ACTIVE_TEX_IDX + 1] = 0;
-        }
-        previewTextures(w, editEntityContextMenu->menuVals[E_ACTIVE_TEX_IDX + 1], ENTITY_TEX);
+
+
+        fclose(fp);
     }
+    
+    return true;
 }
 
 BuildState mainMenuScreen(Menu *m) {
@@ -606,7 +493,7 @@ BuildState editAltMenu(Menu* editSubMenu) {
             return SWITCH_LEVEL;
         } else if (editSubMenu->cursor == 2) {
             // save
-            return EDITING;
+            return SAVE_EXPORT;
         } else if (editSubMenu->cursor == 3) {
             // save & exit
             return EXIT;
@@ -642,8 +529,8 @@ BuildState editingLoop(Workspace* w, Menu* editTileContextMenu, Menu* editEntity
                     w->entityEditCollision = false;
                     w->editingNewEntity = true;
                     int editEntityIdx = w->levels[w->activeEditLevel].nextFreeEnt;
-                    w->levels[w->activeEditLevel].ents[editEntityIdx].attr[E_POS_X] = TILE_PIX_HEIGHT * w->cursorRow;
-                    w->levels[w->activeEditLevel].ents[editEntityIdx].attr[E_POS_Y] = TILE_PIX_WIDTH * w->cursorCol;
+                    w->levels[w->activeEditLevel].ents[editEntityIdx].attr[E_POS_X] = TILE_PIX_HEIGHT * w->cursorCol;
+                    w->levels[w->activeEditLevel].ents[editEntityIdx].attr[E_POS_Y] = TILE_PIX_WIDTH * w->cursorRow;
                     for (int i = 1; i < E_NUM_ATTR; i++) {
                         editEntityContextMenu->menuVals[i] = w->levels[w->activeEditLevel].ents[editEntityIdx].attr[i - 1];
                     }
@@ -737,3 +624,33 @@ BuildState editingLoop(Workspace* w, Menu* editTileContextMenu, Menu* editEntity
     return EDITING;
 }
 
+BuildState saveExportMenu(Workspace* w, Menu* m) {
+    static char* levelFilepath, *workspaceFilepath;
+    listCurrentSaves();
+    drawMenuRec(m);
+
+    switch(traverseMenu(m, m->menuTypes[m->cursor])) {
+        case KEY_ENTER:
+            if (m->cursor == 2) {
+                //confirm
+                levelFilepath = (char*)malloc(sizeof(char) * 64);
+                workspaceFilepath = (char*)malloc(sizeof(char) * 64);
+                strcpy(levelFilepath, LEVEL_SAVE_PATH);
+                strcpy(workspaceFilepath, WKSPC_SAVE_PATH);
+                strcat(levelFilepath, m->tBox[0].text);
+                strcat(workspaceFilepath, m->tBox[1].text);
+
+                exportLevels(w, levelFilepath);
+                exportWorkspace(w, workspaceFilepath);
+                return EDITING;
+            } else if (m->cursor == 3) {
+                // back
+                return EDITING;
+            }
+            break;
+        default:
+            break;
+    }
+
+    return SAVE_EXPORT;
+}
