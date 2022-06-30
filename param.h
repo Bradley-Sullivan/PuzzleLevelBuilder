@@ -1,13 +1,15 @@
 /**
  * @file drawParam.h
  * @author Bradley Sullivan (bradleysullivan@nevada.unr.edu)
- * @brief Main header file for useful drawing macros
+ * @brief Main header file for core data structs and macros
  * @version 0.1
  * @date 2022-06-07
  * 
  * @copyright Copyright (c) 2022
  * 
  */
+#ifndef PARAM_H
+#define PARAM_H
 
 #define WINDOW_WIDTH        GetScreenWidth()
 #define WINDOW_HEIGHT       GetScreenHeight()
@@ -17,10 +19,13 @@
 #define TILE_PIX_WIDTH     32
 #define TILE_PIX_HEIGHT    32
 
-#define TILE_DIRECTORY     "assets/Tile"
-#define ENTITY_DIRECTORY   "assets/Entity"
-#define OTHER_DIRECTORY    "assets/Other"
+#define TILE_DIRECTORY     "assets/Tile/"
+#define ENTITY_DIRECTORY   "assets/Entity/"
+#define OTHER_DIRECTORY    "assets/Other/"
 #define CURSOR_FILEPATH    "assets/cursor.png"
+
+#define LEVEL_SAVE_PATH     "data/level_save/"
+#define WKSPC_SAVE_PATH     "data/wkspc_save/"
 
 #define MAX_NUM_LEVELS     128
 #define MAX_LEVEL_ROWS     64
@@ -73,8 +78,7 @@
 
 typedef struct Tile {
     char* tileID;
-    
-    int numEnts;            // editor only attribute used for hashing
+
     int attr[14];           // tile's attributes
 } Tile;
 
@@ -127,7 +131,7 @@ typedef struct Workspace {
     Texture2D* tileTex;
     Texture2D* entityTex;
     Texture2D* otherTex;
-
+    
     Texture2D cursorTex;
 
 } Workspace;
@@ -148,3 +152,5 @@ typedef enum TexType {
     ENTITY_TEX,
     OTHER_TEX
 } TexType;
+
+#endif  // PARAM_H
