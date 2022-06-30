@@ -2,7 +2,7 @@ TODO:
     Need to construct a basic level renderer
         + render other levels like they're stacked (style points)
         + custom shaders and palette switching??
-    Need a dynamic texture loading process
+    Need a dynamic texture loading process [DONE!]
         + able to search directories and enumerate textures??
         + calculates number of textures based on tex-sheet dimensions?
         + texture "type-ing" system
@@ -127,4 +127,38 @@ Tool Menu Ideas
     + Create Level Preset
     + Duplicate Level
             
-            
+
+LEVEL FILE FORMAT 
+    + Stage header
+        = Syntax
+            - :<Level ID>,<Num. Rows>,<Num. Cols>:<\n>
+        = Info.
+            - This provides an identifier for the level/stage as well as the necessary sizing params.
+            - Preceded by a colon, terminated by a newline.
+    + Tile Chunk 
+        = Basic per-Tile Syntax
+            - ;<Tile ID>,<Comma separated attr.>, ... , <TileID>,<Comma separated attr.><\n>
+        = Info.
+            - This contains all information about every tile in the stage. Preceded by a semicolon, terminated by a newline.
+    + Entity Chunk
+        = Basic per-Entity Syntax
+            - ;<Entity ID>,<Comma separated attr.>, ... , <Entity ID>,<Comma separated attr.><\n>
+        = Info.
+            - Follows suit with tile chunk.
+    + End-of-Stage Chunk
+        = Basic Syntax
+            - #<Level ID>#<\n>
+        = Info.
+            - Denotes the end of level information.
+
+WORKSPACE FILE FORMAT
+    + Workspace header
+        = Syntax
+            - +<Workspace ID>,<Num. Levels>,<Active Edit Level>,<Next New Level>+<\n>
+        = Info.
+            - Denotes the beginning of a workspace
+    + Level/Stage Chunk
+        = This chunk will store all level info. normally (see above)
+    + Workspace footer
+        = Syntax 
+            - =<Workspace ID>=<\n>
