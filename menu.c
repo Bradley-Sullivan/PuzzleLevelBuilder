@@ -1,10 +1,10 @@
 #include "menu.h"
 
-void initMenu(Menu *m, int numSel, int initCursor, int selFontSize, char sel[][MAX_MENU_LEN], int types[], bool isContextMenu) {
+void initMenu(Menu *m, int numSel, int selFontSize, char sel[][MAX_MENU_LEN], int types[], bool isContextMenu) {
     int numTextEntry = 0;
 
     m->isContextMenu = isContextMenu;
-    m->cursor = initCursor;
+    m->cursor = 0;
     m->numSel = numSel;
     m->selFS = selFontSize;
 
@@ -27,11 +27,45 @@ void initMenu(Menu *m, int numSel, int initCursor, int selFontSize, char sel[][M
             if (m->menuTypes[i] == TEXT_ENTRY) {
                 if (isContextMenu) {
                     int xOff = (EDIT_WIDTH / 2) + getLongSelSize(m);
-                    initTextBox(&m->tBox[i], 10, m->selFS, 0, xOff, EDIT_HEIGHT / 2 - 5);
+                    initTextBox(&m->tBox[i], 11, m->selFS, 0, xOff, EDIT_HEIGHT / 2 - 5);
                 } else {
                     int xOff = EDIT_WIDTH + getLongSelSize(m);
-                    initTextBox(&m->tBox[i], 10, m->selFS, 0, xOff, ((i + 1) * m->selFS) - 5);
+                    initTextBox(&m->tBox[i], 11, m->selFS, 0, xOff, ((i + 1) * m->selFS) - 5);
                 }
+            }
+        }
+    }
+}
+
+void initMenuRec(Menu* m, int numSel, int selFontSize, char sel[][MAX_MENU_LEN], int types[], Rectangle rec, Color c) {
+    int numTextEntry = 0;
+
+    m->isContextMenu = false;
+    m->cursor = 0;
+    m->numSel = numSel;
+    m->selFS = selFontSize;
+    m->rec = rec;
+    m->background = c;
+
+    m->menuTypes = (int*)malloc(sizeof(int) * numSel);
+    m->menuVals = (int*)malloc(sizeof(int) * numSel);
+    m->sel = (char**)malloc(sizeof(char*) * numSel);
+    for (int i = 0; i < numSel; i++) {
+        if (types[i] == TEXT_ENTRY) {
+            numTextEntry++;
+        }
+        m->sel[i] = (char*)malloc(sizeof(char) * MAX_MENU_LEN);
+        m->sel[i] = sel[i];
+        m->menuTypes[i] = types[i];
+        m->menuVals[i] = 0;
+    }
+
+    if (numTextEntry > 0) {
+        m->tBox = (TextBox*)malloc(sizeof(TextBox) * numSel);
+        for (int i = 0; i < numSel; i++) {
+            if (m->menuTypes[i] == TEXT_ENTRY) {
+                int xOff = rec.x + getLongSelSize(m) + 50;
+                initTextBox(&m->tBox[i], 11, selFontSize, 0, xOff, (m->selFS * i) + m->selFS + m->rec.y);
             }
         }
     }
@@ -83,24 +117,21 @@ void clearTextBox(TextBox* t) {
 }
 
 void drawMenu(Menu* m) {
-    int begOffset, yOffset;
+    int xOffset, yOffset;
     int identSelSize = getLongSelSize(m) + 50;
     char buf[8];
 
     if (m->isContextMenu) {
-        begOffset = (EDIT_WIDTH / 2) + 50;
+        xOffset = (EDIT_WIDTH / 2) + 50;
         DrawRectangle((EDIT_WIDTH / 2) + 40, (EDIT_HEIGHT / 2) - 10, identSelSize + 50, m->numSel * m->selFS + 20, (Color){25, 25, 25, 250});
-        DrawText(">", begOffset - MeasureText(">", m->selFS), (m->cursor * m->selFS) + (WINDOW_HEIGHT / 2), m->selFS, RAYWHITE);
+        DrawText(">", xOffset - MeasureText(">", m->selFS), (m->cursor * m->selFS) + (WINDOW_HEIGHT / 2), m->selFS, RAYWHITE);
     } else {
-        begOffset = EDIT_WIDTH + 2 * m->selFS;
+        xOffset = EDIT_WIDTH + 2 * m->selFS;
         DrawText(">", EDIT_WIDTH + m->selFS, m->selFS + (m->cursor * m->selFS), m->selFS, RAYWHITE);
     }
 
 
     for (int i = 0; i < m->numSel; i++) {
-        int curSelSize = MeasureText(m->sel[i], m->selFS);
-        int identWidth = curSelSize + (identSelSize - curSelSize);
-
         if (m->isContextMenu) {
             yOffset = (WINDOW_HEIGHT / 2) + (i * m->selFS);
         } else {
@@ -109,29 +140,76 @@ void drawMenu(Menu* m) {
 
         switch (m->menuTypes[i]) {
             case SIMPLE_MENU:
-                DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
+                DrawText(m->sel[i], xOffset, yOffset, m->selFS, RAYWHITE);
                 break;
             case PLUS_MINUS_MENU:
-                DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
+                DrawText(m->sel[i], xOffset, yOffset, m->selFS, RAYWHITE);
                 sprintf(buf, "- %d +", m->menuVals[i]);
-                DrawText(buf, begOffset + identWidth, yOffset, m->selFS, RAYWHITE);
+                DrawText(buf, xOffset + identSelSize, yOffset, m->selFS, RAYWHITE);
                 break;
             case CHECKLIST_MENU:
-                DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
+                DrawText(m->sel[i], xOffset, yOffset, m->selFS, RAYWHITE);
                 if (m->menuVals[i]) {
-                    DrawText("[x]", begOffset + identWidth, yOffset, m->selFS, RAYWHITE);
+                    DrawText("[x]", xOffset + identSelSize, yOffset, m->selFS, RAYWHITE);
                 } else {
-                    DrawText("[ ]", begOffset + identWidth, yOffset, m->selFS, RAYWHITE);
+                    DrawText("[ ]", xOffset + identSelSize, yOffset, m->selFS, RAYWHITE);
                 }
                 break;
             case TEXT_ENTRY:
-                DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
+                DrawText(m->sel[i], xOffset, yOffset, m->selFS, RAYWHITE);
                 drawTextBox(&m->tBox[i], m->tBox[i].editing);
                 break;
             case DISPLAY_VAL:
-                DrawText(m->sel[i], begOffset, yOffset, m->selFS, RAYWHITE);
+                DrawText(m->sel[i], xOffset, yOffset, m->selFS, RAYWHITE);
                 sprintf(buf, "%d", m->menuVals[i]);
-                DrawText(buf, begOffset + identWidth, yOffset, m->selFS, RAYWHITE);
+                DrawText(buf, xOffset + identSelSize, yOffset, m->selFS, RAYWHITE);
+                break;
+            default:
+                break;
+        }
+
+    }
+}
+
+void drawMenuRec(Menu* m) {
+    int xOffset, yOffset;
+    int identSelSize = getLongSelSize(m) + 50;
+    char buf[8];
+
+    xOffset = m->rec.x + 2 * m->selFS;
+
+    DrawRectangleRec(m->rec, m->background);
+    DrawText(">", m->rec.x + m->selFS, m->selFS + (m->cursor * m->selFS) + m->rec.y, m->selFS, RAYWHITE);
+
+
+    for (int i = 0; i < m->numSel; i++) {
+        yOffset = m->selFS + (i * m->selFS) + m->rec.y;
+
+        switch (m->menuTypes[i]) {
+            case SIMPLE_MENU:
+                DrawText(m->sel[i], xOffset, yOffset, m->selFS, RAYWHITE);
+                break;
+            case PLUS_MINUS_MENU:
+                DrawText(m->sel[i], xOffset, yOffset, m->selFS, RAYWHITE);
+                sprintf(buf, "- %d +", m->menuVals[i]);
+                DrawText(buf, xOffset + identSelSize, yOffset, m->selFS, RAYWHITE);
+                break;
+            case CHECKLIST_MENU:
+                DrawText(m->sel[i], xOffset, yOffset, m->selFS, RAYWHITE);
+                if (m->menuVals[i]) {
+                    DrawText("[x]", xOffset + identSelSize, yOffset, m->selFS, RAYWHITE);
+                } else {
+                    DrawText("[ ]", xOffset + identSelSize, yOffset, m->selFS, RAYWHITE);
+                }
+                break;
+            case TEXT_ENTRY:
+                DrawText(m->sel[i], xOffset, yOffset, m->selFS, RAYWHITE);
+                drawTextBox(&m->tBox[i], m->tBox[i].editing);
+                break;
+            case DISPLAY_VAL:
+                DrawText(m->sel[i], xOffset, yOffset, m->selFS, RAYWHITE);
+                sprintf(buf, "%d", m->menuVals[i]);
+                DrawText(buf, xOffset + identSelSize, yOffset, m->selFS, RAYWHITE);
                 break;
             default:
                 break;

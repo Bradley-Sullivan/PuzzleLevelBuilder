@@ -8,11 +8,13 @@
  * @copyright Copyright (c) 2022
  * 
  */
+#ifndef MENU_H
+#define MENU_H
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include "include/raylib.h"
+#include <raylib.h>
 #include "param.h"
 
 #define MAIN_MENU_FS        30
@@ -62,9 +64,13 @@ typedef struct Menu {
     char** sel;
 
     TextBox* tBox;
+
+    Rectangle rec;
+    Color background;
 } Menu;
 
-void initMenu(Menu* m, int numSel, int initCursor, int selFontSize, char sel[][MAX_MENU_LEN], int types[], bool isContextMenu);
+void initMenu(Menu* m, int numSel, int selFontSize, char sel[][MAX_MENU_LEN], int types[], bool isContextMenu);
+void initMenuRec(Menu* m, int numSel, int selFontSize, char sel[][MAX_MENU_LEN], int types[], Rectangle rec, Color c);
 void initTextBox(TextBox* t, int editDisplayWidth, int fontSize, int initCursor, double x, double y);
 
 // add reset/clear functions for menu and tboxes
@@ -72,6 +78,7 @@ void resetMenu(Menu* m);
 void clearTextBox(TextBox* t);
 
 void drawMenu(Menu* m);
+void drawMenuRec(Menu* m);
 void drawTextBox(TextBox* t, bool active);
 
 int traverseMenu(Menu* m, int menuType);
@@ -79,3 +86,5 @@ bool editTextBox(TextBox* t);
 
 int getLongestSel(Menu* m);
 int getLongSelSize(Menu* m);
+
+#endif //MENU_H
