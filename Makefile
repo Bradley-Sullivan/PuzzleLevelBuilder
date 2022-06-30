@@ -14,14 +14,20 @@ endif
 
 all: builder
 
-builder: main.o menu.o
-	$(CC) main.o menu.o -o builder $(CFLAGS)
+builder: main.o menu.o edit_ui.o draw.o
+	$(CC) main.o menu.o edit_ui.o draw.o -o builder $(CFLAGS)
 
-main.o: main.c menu.h
+main.o: main.c menu.h edit_ui.h draw.h
 	$(CC) $(CFLAGS) -c main.c
 
 menu.o: menu.c menu.h
 	$(CC) $(CFLAGS) -c menu.c
+
+edit_ui.o: edit_ui.c edit_ui.h
+	$(CC) $(CFLAGS) -c edit_ui.c
+
+draw.o: draw.c draw.h
+	$(CC) $(CFLAGS) -c draw.c
 
 clean:
 	rm *.o
