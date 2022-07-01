@@ -64,7 +64,7 @@ void initMenuRec(Menu* m, int numSel, int selFontSize, char sel[][MAX_MENU_LEN],
         m->tBox = (TextBox*)malloc(sizeof(TextBox) * numSel);
         for (int i = 0; i < numSel; i++) {
             if (m->menuTypes[i] == TEXT_ENTRY) {
-                int xOff = rec.x + getLongSelSize(m) + 50;
+                int xOff = rec.x + getLongSelSize(m) + 4 * m->selFS;
                 initTextBox(&m->tBox[i], 11, selFontSize, 0, xOff, (m->selFS * i) + m->selFS + m->rec.y);
             }
         }
