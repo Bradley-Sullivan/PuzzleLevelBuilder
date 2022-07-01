@@ -41,20 +41,22 @@
 */
 
 void initWorkspace(Workspace* w);
-bool initLevel(Level* l, char* id, int texIdx, int r, int c);
+bool initLevel(Level* l, char* id, int texIdx, int r, int c, int e);
 bool loadTextures(Workspace* w);
 int loadTexHelper(Texture2D dest[], char* dir);
+// bool exportWorkspace(Workspace* w, char* filepath);
+bool exportLevels(Workspace* w, char* filepath);
+bool loadLevels(Workspace* w, char* filepath);
+bool parseLevels(FILE* fp, Level* l, int numLevels);
+bool parseEntities(FILE* fp, Level*l, int numEnts);
+bool importLevels(Workspace* w, char* filepath);
 
 int getEntIdx(Level* l, char* id, int row, int col);
 int getNumEntCollisions(Level* l, int row, int col);
 bool getEntCollisionIDs(Level* l, char** ids, int row, int col);
 int listCurrentSaves();
-int errorMenu(const char* msg);
 
-// bool exportWorkspace(Workspace* w, char* filepath);
-bool exportLevels(Workspace* w, char* filepath);
-bool loadLevels(Workspace* w, char* filepath);
-bool importLevels(Workspace* w, char* filepath);
+
 
 BuildState mainMenuScreen(Menu* m);
 BuildState levelInitConfig(Menu* m, Workspace* w);
@@ -173,7 +175,7 @@ void initWorkspace(Workspace* w) {
     }
 }
 
-bool initLevel(Level* l, char* id, int texIdx, int r, int c) {
+bool initLevel(Level* l, char* id, int texIdx, int r, int c, int e) {
     if (r <= 0 || c <= 0) {
         printf("\nERROR: invalid level dimensions\n\n");
         return false;
@@ -212,7 +214,7 @@ bool initLevel(Level* l, char* id, int texIdx, int r, int c) {
             }
         }
         
-        l->nextFreeEnt = 0;
+        l->nextFreeEnt = e;
 
         l->initialized = true;
 
@@ -334,6 +336,7 @@ int listCurrentSaves() {
     DrawRectangle(15, 15, EDIT_WIDTH - 30, WINDOW_HEIGHT - 60, BLACK);
 
     filenames = LoadDirectoryFiles(LEVEL_SAVE_PATH, &numLevelSave);
+    
     for (int i = 0; i < numLevelSave; i++) {
         if (strcmp(".", filenames[i]) == 0 || strcmp("..", filenames[i]) == 0) {
             for (int k = i; k < numLevelSave - 1; k++) {
@@ -342,6 +345,7 @@ int listCurrentSaves() {
             numLevelSave -= 1;
         }
     }
+
     DrawText("SAVED LEVEL FILES", 25, 25, 25, RAYWHITE);
     if (numLevelSave > 0) {
         int xOffset = 50;
@@ -367,7 +371,7 @@ bool exportLevels(Workspace* w, char* filepath) {
     } else {
         fprintf(fp, "[%d]\n", w->nextNewLevel);
         for (int i = 0; i < w->nextNewLevel; i++) {   
-            fprintf(fp, ":%s,%d,%d:\n;", w->levels[i].levelID, w->levels[i].numRows, w->levels[i].numCols);
+            fprintf(fp, ":%s,%d,%d,%d:\n;", w->levels[i].levelID, w->levels[i].numRows, w->levels[i].numCols, w->levels[i].nextFreeEnt);
             for (int k = 0; k < w->levels[i].numRows; k++) {
                 for (int j = 0; j < w->levels[i].numCols; j++) {
                     char* printStr = (char*)malloc(sizeof(char) * (2 * T_NUM_ATTR * w->levels[i].numCols + MAX_TILE_ID_LEN));
@@ -409,9 +413,8 @@ bool exportLevels(Workspace* w, char* filepath) {
                 }
                 fprintf(fp, "%s", printStr);
             }
-            fprintf(fp, "\n\n");
+            fprintf(fp, "\n");
         }
-
 
         fclose(fp);
     }
@@ -429,45 +432,103 @@ bool loadLevels(Workspace* w, char* filepath) {
     } else {
         if (fscanf(fp, "[%d]\n", &w->nextNewLevel) == 1) {
             for (int i = 0; i < w->nextNewLevel; i++) {
-                char* idBuf = (char*)malloc(sizeof(char) * MAX_LEVEL_ID_LEN);
-                int r, c;
-                if (fscanf(fp, ":%[^,],%d,%d:\n;", idBuf, &r, &c) == 3) {
-                    printf(":%s,%d,%d:\n", idBuf, r, c);
-                    initLevel(&w->levels[i], idBuf, 0, r, c);
-                    for (int j = 0; j < r; j++) {
-                        for (int k = 0; k < c; k++) {
-                            char* tileIDBuf = (char*)malloc(sizeof(char) * MAX_TILE_ID_LEN);
-                            if (fscanf(fp, "%[^,],", tileIDBuf) == 1) {
-                                printf(";%s,", tileIDBuf);
-                                strcpy(w->levels[i].tiles[j][k].tileID, tileIDBuf);
-                                for (int l = 0; l < T_NUM_ATTR; l++) {
-                                    if (fscanf(fp, "%d%*[,;]", &w->levels[i].tiles[j][k].attr[l]) == 1) {
-                                        printf(" %d ", w->levels[i].tiles[j][k].attr[l]);
-                                    } else {
-                                        printf("ERROR: File is in the incorrect format. Could not parse tile attr.\n");
-                                        return false;
-                                    }
-                                }
-                                printf("\n");
-                            } else {
-                                printf("ERROR: File is in the incorrect format. Could not parse tileID.\n");
-
-                                return false;
-                            }
-                            
-                        }
-                    } 
+                if (parseLevels(fp, &w->levels[i], w->nextNewLevel)) {
+                    if (!parseEntities(fp, &w->levels[i], w->levels[i].nextFreeEnt)) {
+                        printf("ERROR: Unable to parse entities. Aborting level load process\n");
+                        return false;                            
+                    }
                 } else {
-                    printf("ERROR: File is in the incorrect format. Could not parse level header.\n");
+                    printf("ERROR: Unable to parse levels. Aborting entity loading.\n");
                     return false;
                 }
                  
             }
         } else {
-            printf("ERROR: File is in the incorrect format\n");
+            printf("ERROR: File is in the incorrect format. Could not parse file header.\n");
             return false;
         }        
     }
+
+    return true;
+}
+
+bool parseLevels(FILE* fp, Level* l, int numLevels) {
+    printf("attempting to parse %d levels\n", numLevels);
+    for (int i = 0; i < numLevels; i++) {
+        int r, c, e;
+        char* idBuf = (char*)malloc(sizeof(char) * MAX_LEVEL_ID_LEN);
+        if (fscanf(fp, ":%[^,],%d,%d,%d:\n;", idBuf, &r, &c, &e) == 4) {
+            printf(":%s,%d,%d,%d:\n", idBuf, r, c, e);
+            initLevel(l, idBuf, 0, r, c, e);
+            for (int j = 0; j < r; j++) {
+                for (int k = 0; k < c; k++) {
+                    if (fscanf(fp, "%[^,],", l->tiles[j][k].tileID) == 1) {
+                        printf(";%s,", l->tiles[j][k].tileID);
+                        for (int m = 0; m < T_NUM_ATTR; m++) {
+                            if (m < T_NUM_ATTR - 1) {
+                                if (fscanf(fp, "%d%*[,;]", &l->tiles[j][k].attr[m]) == 1) {
+                                    printf(" %d ", l->tiles[j][k].attr[m]);
+                                } else {
+                                    printf("ERROR: File is in the incorrect format. Could not parse tile attr.\n");
+                                    return false;
+                                }
+                            } else {
+                                if (fscanf(fp, "%d;\n", &l->tiles[j][k].attr[m]) == 1) {
+                                    printf(" %d;", l->tiles[j][k].attr[m]);
+                                } else {
+                                    printf("ERROR: File is in the incorrect format. Could not parse tile attr.\n");
+                                    return false;
+                                }
+                            }                            
+                        }
+                        printf("\n");
+                    } else {
+                        printf("ERROR: File is in the incorrect format. Could not parse tileID.\n");
+                        return false;
+                    }
+                    
+                }
+            } 
+        } else {
+            printf("ERROR: File is in the incorrect format. Could not parse level header.\n");
+            return false;
+        }
+            
+    }
+
+    return true;
+}
+
+bool parseEntities(FILE* fp, Level* l, int numEnts) {
+    printf("attempting to parse %d entities\n", numEnts);
+    for (int i = 0; i < numEnts; i++) {
+        l->ents[i].existsInWorkspace = true;
+        if (fscanf(fp, ";%[^,],", l->ents[i].entityID) == 1) {
+            printf(";%s,", l->ents[i].entityID);
+            for (int k = 0; k < E_NUM_ATTR; k++) {
+                if (k < E_NUM_ATTR - 1) {
+                    if (fscanf(fp, "%d%*[,;]", &l->ents[i].attr[k]) == 1) {
+                        printf(" %d ", l->ents[i].attr[k]);
+                    } else {
+                        printf("ERROR: File is in the incorrect format. Could not parse entity attr.\n");
+                        return false;
+                    }
+                } else {
+                    if (fscanf(fp, "%d", &l->ents[i].attr[k]) == 1) {
+                        printf(" %d ", l->ents[i].attr[k]);
+                    } else {
+                        printf("ERROR: File is in the incorrect format. Could not parse entity attr.\n");
+                        return false;
+                    }
+                }
+            }
+            printf("\n");
+        } else {
+            printf("ERROR: File is in the incorrect format. Could not parse entityID.\n");
+            return false;
+        }
+    }
+
 
     return true;
 }
@@ -507,7 +568,7 @@ BuildState levelInitConfig(Menu* m, Workspace *w) {
     switch (traverseMenu(m, m->menuTypes[m->cursor])) {
         case KEY_ENTER:
             if (m->cursor == 4) {
-                if (initLevel(&w->levels[w->nextNewLevel], m->tBox[0].text, m->menuVals[3], m->menuVals[1], m->menuVals[2])) {
+                if (initLevel(&w->levels[w->nextNewLevel], m->tBox[0].text, m->menuVals[3], m->menuVals[1], m->menuVals[2], 0)) {
                     printf("Successfully initialized level\n");
                     printf("\tLevel ID: %s\n", w->levels[w->nextNewLevel].levelID);
                     printf("\tLevel Rows: %d\n", w->levels[w->nextNewLevel].numRows);
