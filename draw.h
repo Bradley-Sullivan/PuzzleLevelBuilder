@@ -12,5 +12,6 @@
 void renderWorkspace(Workspace* w);
 void drawTileAttr(Tile t, double x, double y);
 void previewTextures(Workspace* w, int tex, TexType type);
+void previewLevel(Workspace* w, int levelIndex);
 
 #endif  //DRAW_H
