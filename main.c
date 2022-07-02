@@ -32,12 +32,12 @@
         Re-evaluate tile attr. and their purpose within the scope of a puzzle game
             Moveable?? Teleporter??
             Secondary textures?/texture mixing??
-        Re-evaluate entity attr. in general
-        Implementing edit tools!!
+     >> Re-evaluate entity attr. in general
+     >> Implementing edit tools!!
             shouldn't be too complex :>
-        Implement adding levels to workspace!!
+        Implement adding levels to workspace!!  [x]
             set active edit to next new, call init level, yadda yadda, bada bing bada boom
-        Implementing level editing switching
+        Implementing level editing switching    [x]
 */
 
 void initWorkspace(Workspace* w);
@@ -167,6 +167,7 @@ void initWorkspace(Workspace* w) {
     w->editingEntity = false;
     w->entityEditCollision = false;
     w->editingNewEntity = false;
+    w->visibleGridlines = false;
     w->activeEditLevel = 0;
     w->nextNewLevel = 0;
     w->editingEntityIdx = -1;

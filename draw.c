@@ -34,6 +34,7 @@ void renderWorkspace(Workspace* w) {
     }
 
     DrawTexture(w->cursorTex, curX, curY, WHITE);
+    if (w->visibleGridlines) drawGridOverlay(w);
 }
 
 void drawTileAttr(Tile t, double x, double y) {
@@ -90,4 +91,20 @@ void previewTextures(Workspace* w, int tex, TexType type) {
 
 void previewLevel(Workspace* w, int levelIndex) {
     
+}
+
+void drawGridOverlay(Workspace* w) {
+    int yOffsetV, xOffsetV, yOffsetH, xOffsetH;
+
+    yOffsetV = (EDIT_HEIGHT / 2) - ((w->cursorRow + 1) * TILE_PIX_HEIGHT) - (TILE_PIX_HEIGHT / 2);
+    for (int i = 0; i < w->levels[w->activeEditLevel].numCols; i++) {
+        xOffsetV = (EDIT_WIDTH / 2) - ((w->cursorCol - i) * TILE_PIX_WIDTH) + (TILE_PIX_WIDTH / 2);
+        DrawLineEx((Vector2){xOffsetV, yOffsetV}, (Vector2){xOffsetV, yOffsetV + TILE_PIX_HEIGHT * (w->levels[w->activeEditLevel].numRows + 1)}, 2.5, WHITE);
+    }
+
+    xOffsetH = (EDIT_WIDTH / 2) - ((w->cursorCol + 1) * TILE_PIX_WIDTH) - (TILE_PIX_WIDTH / 2);
+    for (int i = 0; i < w->levels[w->activeEditLevel].numRows; i++) {
+        yOffsetH = (EDIT_HEIGHT / 2) - ((w->cursorRow - i) * TILE_PIX_HEIGHT) + (TILE_PIX_HEIGHT / 2);
+        DrawLineEx((Vector2){xOffsetH, yOffsetH}, (Vector2){xOffsetH + TILE_PIX_WIDTH * (w->levels[w->activeEditLevel].numCols + 1), yOffsetH}, 2.5, WHITE);
+    }
 }
