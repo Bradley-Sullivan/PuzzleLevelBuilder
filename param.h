@@ -16,8 +16,8 @@
 #define EDIT_WIDTH          (WINDOW_WIDTH * 0.8)
 #define EDIT_HEIGHT         GetScreenHeight()
 
-#define TILE_PIX_WIDTH     32
-#define TILE_PIX_HEIGHT    32
+#define TILE_PIX_WIDTH     48
+#define TILE_PIX_HEIGHT    48
 
 #define TILE_DIRECTORY     "assets/Tile/"
 #define ENTITY_DIRECTORY   "assets/Entity/"
@@ -115,6 +115,7 @@ typedef struct Workspace {
     bool editingEntity;
     bool entityEditCollision;
     bool editingNewEntity;
+    bool visibleGridlines;
 
     int activeEditLevel;
     int nextNewLevel;
