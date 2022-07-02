@@ -23,7 +23,7 @@
 /*
     TODO: (for now)
         Implement workspace saving functionality
-        Lay groundwork for save file parsing and loading
+        Lay groundwork for save file parsing and loading [x]
         Figure out how to implement animation(s) for entities
             within editLoop and how it should get saved to disk
             expand texture loading to incorporate piecing together animations
@@ -47,7 +47,7 @@ int loadTexHelper(Texture2D dest[], char* dir);
 // bool exportWorkspace(Workspace* w, char* filepath);
 bool exportLevels(Workspace* w, char* filepath);
 bool loadLevels(Workspace* w, char* filepath);
-bool parseLevels(FILE* fp, Level* l, int numLevels);
+bool parseLevels(FILE* fp, Level* l);
 bool parseEntities(FILE* fp, Level*l, int numEnts);
 bool importLevels(Workspace* w, char* filepath);
 
@@ -60,17 +60,18 @@ int listCurrentSaves();
 
 BuildState mainMenuScreen(Menu* m);
 BuildState levelInitConfig(Menu* m, Workspace* w);
-BuildState editAltMenu(Menu* editSubMenu);
+BuildState editAltMenu(Workspace* w, Menu* editSubMenu);
 BuildState editingLoop(Workspace* w, Menu* editTileContextMenu, Menu* editEntityContextMenu, Menu* editSubMenu);
 BuildState saveExportMenu(Workspace* w, Menu* m);
 BuildState loadLevelsMenu(Workspace* w, Menu* m);
+BuildState switchLevel(Workspace* w, Menu* m);
 
 int main(void) {
     Workspace editWorkspace;
     BuildState state = MAIN_MENU;
     Menu mainMenu, levelConfMenu, editTileContextMenu 
         ,editEntityContextMenu, editSubMenu, saveMenu
-        ,loadLevelMenu;
+        ,loadLevelMenu, switchLevelMenu;
 
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "test");
     ToggleFullscreen();
@@ -108,7 +109,7 @@ int main(void) {
                                         PLUS_MINUS_MENU, SIMPLE_MENU};
     initMenu(&editEntityContextMenu, E_NUM_ATTR + 2, CONTEXT_MENU_FS, editEntityContextMenuSel, editEntityContextMenuTypes, true);
 
-    char editSubMenuSel[5][MAX_MENU_LEN] = {"TOOLS", "SWITCH LEVEL", "SAVE", "SAVE & EXIT", "QUIT"};
+    char editSubMenuSel[5][MAX_MENU_LEN] = {"TOOLS", "SWITCH LEVEL", "ADD LEVEL", "SAVE", "QUIT"};
     int editSubMenuTypes[5] = {SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU, SIMPLE_MENU};
     initMenu(&editSubMenu, 5, SUB_MENU_FS, editSubMenuSel, editSubMenuTypes, false);
 
@@ -119,6 +120,10 @@ int main(void) {
     char loadLevelMenuSel[3][MAX_MENU_LEN] = {"Filename:", "CONFIRM", "BACK"};
     int loadLevelMenuTypes[3] = {TEXT_ENTRY, SIMPLE_MENU, SIMPLE_MENU};
     initMenuRec(&loadLevelMenu, 3, 25, loadLevelMenuSel, loadLevelMenuTypes, (Rectangle){25, WINDOW_HEIGHT - 160, 0, 0}, BLANK);
+
+    char switchMenuSel[4][MAX_MENU_LEN] = {"LEVEL ID:", "LEVEL INDEX:", "CONFIRM", "BACK"};
+    int switchMenuTypes[4] = {DISPLAY_TEXT, PLUS_MINUS_MENU, SIMPLE_MENU, SIMPLE_MENU};
+    initMenu(&switchLevelMenu, 4, SUB_MENU_FS, switchMenuSel, switchMenuTypes, false);    
 
     while (!WindowShouldClose() && state != EXIT) {
         BeginDrawing();
@@ -135,6 +140,7 @@ int main(void) {
                     state = loadLevelsMenu(&editWorkspace, &loadLevelMenu);
                     break;
                 case SWITCH_LEVEL:
+                    state = switchLevel(&editWorkspace, &switchLevelMenu);
                     break;
                 case EDITING:
                     state = editingLoop(&editWorkspace, &editTileContextMenu, &editEntityContextMenu, &editSubMenu);
@@ -336,7 +342,7 @@ int listCurrentSaves() {
     DrawRectangle(15, 15, EDIT_WIDTH - 30, WINDOW_HEIGHT - 60, BLACK);
 
     filenames = LoadDirectoryFiles(LEVEL_SAVE_PATH, &numLevelSave);
-    
+
     for (int i = 0; i < numLevelSave; i++) {
         if (strcmp(".", filenames[i]) == 0 || strcmp("..", filenames[i]) == 0) {
             for (int k = i; k < numLevelSave - 1; k++) {
@@ -379,7 +385,7 @@ bool exportLevels(Workspace* w, char* filepath) {
                     if (w->levels[i].tiles[j][k].tileID[0] == '\0') {
                         strcpy(printStr, "unnamed,");
                     } else {
-                        sprintf(printStr, ";%s,", w->levels[i].tiles[k][j].tileID);
+                        sprintf(printStr, "%s,", w->levels[i].tiles[k][j].tileID);
                     }
                     for (int l = 0; l < T_NUM_ATTR; l++) {
                         sprintf(tileAttr, "%d", w->levels[i].tiles[k][j].attr[l]);
@@ -430,18 +436,12 @@ bool loadLevels(Workspace* w, char* filepath) {
         printf("ERROR: Could not open path to file in order to export levels\nFILEPATH: %s\n", filepath);
         return false;
     } else {
-        if (fscanf(fp, "[%d]\n", &w->nextNewLevel) == 1) {
+        if (fscanf(fp, "[%d]", &w->nextNewLevel) == 1) {
             for (int i = 0; i < w->nextNewLevel; i++) {
-                if (parseLevels(fp, &w->levels[i], w->nextNewLevel)) {
-                    if (!parseEntities(fp, &w->levels[i], w->levels[i].nextFreeEnt)) {
-                        printf("ERROR: Unable to parse entities. Aborting level load process\n");
-                        return false;                            
-                    }
-                } else {
+                if (!parseLevels(fp, &w->levels[i])) {
                     printf("ERROR: Unable to parse levels. Aborting entity loading.\n");
                     return false;
-                }
-                 
+                }                 
             }
         } else {
             printf("ERROR: File is in the incorrect format. Could not parse file header.\n");
@@ -452,48 +452,48 @@ bool loadLevels(Workspace* w, char* filepath) {
     return true;
 }
 
-bool parseLevels(FILE* fp, Level* l, int numLevels) {
-    printf("attempting to parse %d levels\n", numLevels);
-    for (int i = 0; i < numLevels; i++) {
-        int r, c, e;
-        char* idBuf = (char*)malloc(sizeof(char) * MAX_LEVEL_ID_LEN);
-        if (fscanf(fp, ":%[^,],%d,%d,%d:\n;", idBuf, &r, &c, &e) == 4) {
-            printf(":%s,%d,%d,%d:\n", idBuf, r, c, e);
-            initLevel(l, idBuf, 0, r, c, e);
-            for (int j = 0; j < r; j++) {
-                for (int k = 0; k < c; k++) {
-                    if (fscanf(fp, "%[^,],", l->tiles[j][k].tileID) == 1) {
-                        printf(";%s,", l->tiles[j][k].tileID);
-                        for (int m = 0; m < T_NUM_ATTR; m++) {
-                            if (m < T_NUM_ATTR - 1) {
-                                if (fscanf(fp, "%d%*[,;]", &l->tiles[j][k].attr[m]) == 1) {
-                                    printf(" %d ", l->tiles[j][k].attr[m]);
-                                } else {
-                                    printf("ERROR: File is in the incorrect format. Could not parse tile attr.\n");
-                                    return false;
-                                }
+bool parseLevels(FILE* fp, Level* l) {
+    int r, c, e;
+    char* idBuf = (char*)malloc(sizeof(char) * MAX_LEVEL_ID_LEN);
+    if (fscanf(fp, "\n:%[^,],%d,%d,%d:\n;", idBuf, &r, &c, &e) == 4) {      // parse level header
+        printf(":%s,%d,%d,%d:\n", idBuf, r, c, e);
+        initLevel(l, idBuf, 0, r, c, e);
+        for (int j = 0; j < r; j++) {
+            for (int k = 0; k < c; k++) {
+                if (fscanf(fp, "%[^,],", l->tiles[j][k].tileID) == 1) {     // parse tileID
+                    printf(";%s,", l->tiles[j][k].tileID);
+                    for (int m = 0; m < T_NUM_ATTR; m++) {
+                        if (m < T_NUM_ATTR - 1) {
+                            if (fscanf(fp, "%d%*[,;]", &l->tiles[j][k].attr[m]) == 1) {     // parse tile attr.
+                                printf(" %d ", l->tiles[j][k].attr[m]);
                             } else {
-                                if (fscanf(fp, "%d;\n", &l->tiles[j][k].attr[m]) == 1) {
-                                    printf(" %d;", l->tiles[j][k].attr[m]);
-                                } else {
-                                    printf("ERROR: File is in the incorrect format. Could not parse tile attr.\n");
-                                    return false;
-                                }
-                            }                            
-                        }
-                        printf("\n");
-                    } else {
-                        printf("ERROR: File is in the incorrect format. Could not parse tileID.\n");
-                        return false;
+                                printf("ERROR: File is in the incorrect format. Could not parse tile attr.\n");
+                                return false;
+                            }
+                        } else {
+                            if (fscanf(fp, "%d;", &l->tiles[j][k].attr[m]) == 1) {
+                                printf(" %d;", l->tiles[j][k].attr[m]);
+                            } else {
+                                printf("ERROR: File is in the incorrect format. Could not parse tile attr.\n");
+                                return false;
+                            }
+                        }                            
                     }
-                    
+                    printf("\n");
+                } else {
+                    printf("ERROR: File is in the incorrect format. Could not parse tileID.\n");
+                    return false;
                 }
-            } 
-        } else {
-            printf("ERROR: File is in the incorrect format. Could not parse level header.\n");
-            return false;
+                
+            }
         }
-            
+        if (!parseEntities(fp, l, e)) {
+            printf("ERROR: Unable to parse entities. Aborting level load process\n");
+            return false;       
+        }
+    } else {
+        printf("ERROR: File is in the incorrect format. Could not parse level header.\n");
+        return false;
     }
 
     return true;
@@ -503,7 +503,7 @@ bool parseEntities(FILE* fp, Level* l, int numEnts) {
     printf("attempting to parse %d entities\n", numEnts);
     for (int i = 0; i < numEnts; i++) {
         l->ents[i].existsInWorkspace = true;
-        if (fscanf(fp, ";%[^,],", l->ents[i].entityID) == 1) {
+        if (fscanf(fp, "%[^,],", l->ents[i].entityID) == 1) {
             printf(";%s,", l->ents[i].entityID);
             for (int k = 0; k < E_NUM_ATTR; k++) {
                 if (k < E_NUM_ATTR - 1) {
@@ -514,8 +514,8 @@ bool parseEntities(FILE* fp, Level* l, int numEnts) {
                         return false;
                     }
                 } else {
-                    if (fscanf(fp, "%d", &l->ents[i].attr[k]) == 1) {
-                        printf(" %d ", l->ents[i].attr[k]);
+                    if (fscanf(fp, "%d;", &l->ents[i].attr[k]) == 1) {
+                        printf(" %d ;", l->ents[i].attr[k]);
                     } else {
                         printf("ERROR: File is in the incorrect format. Could not parse entity attr.\n");
                         return false;
@@ -596,7 +596,7 @@ BuildState levelInitConfig(Menu* m, Workspace *w) {
     return NEW_LEVEL;
 }
 
-BuildState editAltMenu(Menu* editSubMenu) {
+BuildState editAltMenu(Workspace* w, Menu* editSubMenu) {
     drawMenu(editSubMenu);
 
     if (traverseMenu(editSubMenu, editSubMenu->menuTypes[editSubMenu->cursor]) == KEY_ENTER) {
@@ -607,11 +607,12 @@ BuildState editAltMenu(Menu* editSubMenu) {
             // level switch menu
             return SWITCH_LEVEL;
         } else if (editSubMenu->cursor == 2) {
+            // add level
+            w->activeEditLevel = w->nextNewLevel;
+            return NEW_LEVEL;
+        } else if (editSubMenu->cursor == 3) {
             // save
             return SAVE_EXPORT;
-        } else if (editSubMenu->cursor == 3) {
-            // save & exit
-            return EXIT;
         } else if (editSubMenu->cursor == 4) {
             return EXIT;
         }
@@ -707,7 +708,7 @@ BuildState editingLoop(Workspace* w, Menu* editTileContextMenu, Menu* editEntity
             entityEdit(w, editEntityContextMenu, w->editingNewEntity);
         }
     } else if (IsKeyDown(KEY_LEFT_SHIFT)) {
-        return editAltMenu(editSubMenu);
+        return editAltMenu(w, editSubMenu);
     } else {
         drawTileAttr(w->levels[w->activeEditLevel].tiles[w->cursorRow][w->cursorCol], 0, 0);
 
@@ -799,4 +800,31 @@ BuildState loadLevelsMenu(Workspace* w, Menu* m) {
     }
 
     return LOAD_LEVEL;
+}
+
+BuildState switchLevel(Workspace* w, Menu* m) {
+    strncpy(m->tBox[0].text, w->levels[m->menuVals[1]].levelID, MAX_LEVEL_ID_LEN);
+    
+    // previewLevel(w, m->menuVals[1]);
+    drawMenu(m);
+
+    switch (traverseMenu(m, m->menuTypes[m->cursor])) {
+        case KEY_ENTER:
+            if (m->cursor == 2) {
+                // confirm
+                w->activeEditLevel = m->menuVals[1];
+                return EDITING;
+            } else if (m->cursor == 3) {
+                // back
+                return EDITING;
+            }
+            break;
+        default:
+            break;
+    }
+
+    if (m->menuVals[1] < 0) m->menuVals[1] = 0;
+    if (m->menuVals[1] > w->nextNewLevel - 1) m->menuVals[1] = w->nextNewLevel - 1;
+
+    return SWITCH_LEVEL;
 }
