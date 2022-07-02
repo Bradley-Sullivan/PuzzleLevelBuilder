@@ -30,6 +30,7 @@
 #define CHECKLIST_MENU      2
 #define TEXT_ENTRY          3
 #define DISPLAY_VAL         4
+#define DISPLAY_TEXT        5
 
 typedef struct TextBox {
     bool editing;

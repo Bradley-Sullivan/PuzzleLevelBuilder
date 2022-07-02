@@ -12,7 +12,7 @@ void initMenu(Menu *m, int numSel, int selFontSize, char sel[][MAX_MENU_LEN], in
     m->menuVals = (int*)malloc(sizeof(int) * numSel);
     m->sel = (char**)malloc(sizeof(char*) * numSel);
     for (int i = 0; i < numSel; i++) {
-        if (types[i] == TEXT_ENTRY) {
+        if (types[i] == TEXT_ENTRY || DISPLAY_TEXT) {
             numTextEntry++;
         }
         m->sel[i] = (char*)malloc(sizeof(char) * MAX_MENU_LEN);
@@ -24,7 +24,7 @@ void initMenu(Menu *m, int numSel, int selFontSize, char sel[][MAX_MENU_LEN], in
     if (numTextEntry > 0) {
         m->tBox = (TextBox*)malloc(sizeof(TextBox) * numSel);
         for (int i = 0; i < numSel; i++) {
-            if (m->menuTypes[i] == TEXT_ENTRY) {
+            if (m->menuTypes[i] == TEXT_ENTRY || m->menuTypes[i] == DISPLAY_TEXT) {
                 if (isContextMenu) {
                     int xOff = (EDIT_WIDTH / 2) + getLongSelSize(m);
                     initTextBox(&m->tBox[i], 11, m->selFS, 0, xOff, EDIT_HEIGHT / 2 - 5);
@@ -63,7 +63,7 @@ void initMenuRec(Menu* m, int numSel, int selFontSize, char sel[][MAX_MENU_LEN],
     if (numTextEntry > 0) {
         m->tBox = (TextBox*)malloc(sizeof(TextBox) * numSel);
         for (int i = 0; i < numSel; i++) {
-            if (m->menuTypes[i] == TEXT_ENTRY) {
+            if (m->menuTypes[i] == TEXT_ENTRY || m->menuTypes[i] == DISPLAY_TEXT) {
                 int xOff = rec.x + getLongSelSize(m) + 4 * m->selFS;
                 initTextBox(&m->tBox[i], 11, selFontSize, 0, xOff, (m->selFS * i) + m->selFS + m->rec.y);
             }
@@ -163,6 +163,14 @@ void drawMenu(Menu* m) {
                 DrawText(m->sel[i], xOffset, yOffset, m->selFS, RAYWHITE);
                 sprintf(buf, "%d", m->menuVals[i]);
                 DrawText(buf, xOffset + identSelSize, yOffset, m->selFS, RAYWHITE);
+                break;
+            case DISPLAY_TEXT:
+                DrawText(m->sel[i], xOffset, yOffset, m->selFS, RAYWHITE);
+                if (identSelSize + MeasureText(m->tBox[i].text, m->selFS) > WINDOW_WIDTH) {
+                    DrawText(m->tBox[i].text, xOffset + identSelSize - (MeasureText(m->tBox[i].text, m->selFS)), yOffset, m->selFS, GRAY);
+                } else {
+                    DrawText(m->tBox[i].text, xOffset + identSelSize, yOffset, m->selFS, GRAY);
+                }
                 break;
             default:
                 break;
