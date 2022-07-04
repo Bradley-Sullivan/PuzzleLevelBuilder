@@ -39,47 +39,61 @@
 
 #define T_NUM_ATTR          14
 #define E_NUM_ATTR          20
+#define TRG_NUM_ATTR        12
 
-#define T_PLAYER_COLL       0   // has player collision
-#define T_ENTITY_COLL       1   // has entity collision
-#define T_PROJ_COLL         2   // has proj. collision
-#define T_MOVEABLE          3   // player-mutable position
-#define T_P_SPAWN           4   // player initial spawn point
-#define T_E_SPAWN           5   // entity spawn point
-#define T_LVL_END           6   // level end goal
-#define T_TELEPORTER        7   // teleporter tile
-#define T_ONE_WAY_TELE      8   // one-way teleporter tile flag (teleporter flag gets inverted once tele is taken)
-#define T_TEXTURE_IDX       9   
-#define T_ROW               10  // tex-sheet index
-#define T_COL               11  // tile's row-position in level grid
-#define T_E_SPAWN_CH        12  // entity spawn channel
-#define T_TELE_CH           13  // teleporter channel
+#define T_TEXTURE_IDX       0
+#define T_PLAYER_COLL       1
+#define T_ENTITY_COLL       2
+#define T_IS_TEXTURED       3
+#define T_IS_LVL_END        4
+#define T_IS_MOVEABLE       5
+#define T_IS_P_SPAWN        6
+#define T_IS_E_SPAWN        7
+#define T_TELEPORTER        8
+#define T_ONE_WAY_TELE      9
+#define T_TELE_CH           10
+#define T_E_SPAWN_CH        11
+#define T_ROW               12
+#define T_COL               13
 
-#define E_IS_HOSTILE        0   // enemy/entity which does directly harm
-#define E_IS_PASSIVE        1   // enemy/entity which does not directly harm
-#define E_IS_ACTIVE         2   // basic state variable
-#define E_IS_TRG_HEAD       3   // is main point of trigger for other entities on same channel
-#define E_IS_TEXTURED       4   // is not blank texture            
-#define E_PLAYER_COLL       5   // has player collision
-#define E_ENTITY_COLL       6   // has base entity collision             
-#define E_PROJ_COLL         7   // has proj. collision            
-#define E_ACTIVE_INT        8   // interactable with player "use" key           
-#define E_PASSIVE_INT       9   // interactable with player collision         
-#define E_EFFECT_MAG        10  // gen. purpose effect magnitude var. 
-#define E_DIR_X             11  // projectile/enemy/etc. x sign
-#define E_DIR_Y             12  // projectile/enemy/etc. y sign
-#define E_TEXTURE_IDX       13  // texture to be drawn passively (i.e. by default)  
-#define E_ACTIVE_TEX_IDX    14  // texture to be drawn on true active state
-#define E_TRIGGER_CH        15  // default trigger channel -> -1
-#define E_POS_X             16  // entity x-position (top-left of ent. with respect to the top-leftmost corner of level)
-#define E_POS_Y             17  // entity y-position (top-left of ent. with respect to the top-leftmost corner of level)
-#define E_MOVE_SPEED        18  // entity moving step value    
-#define E_ANIM_PERIOD       19  // animation period in millis
+#define E_TEXTURE_IDX       0
+#define E_PLAYER_COLL       1
+#define E_ENTITY_COLL       2
+#define E_IS_TEXTURED       3
+#define E_IS_MOBILE         4
+#define E_IS_ANIMATED       5
+#define E_IS_HOSTILE        6
+#define E_IS_PASSIVE        7
+#define E_IS_ACTIVE         8
+#define E_IS_TRIGGERABLE    9
+#define E_RENDER_LAYER      10
+#define E_EFFECT_MAG        11
+#define E_MOVE_SPEED        12
+#define E_ANIM_PERIOD       13
+#define E_TRIGGER_CH        14
+#define E_SPAWN_CH          15
+#define E_POS_X             16
+#define E_POS_Y             17
+#define E_DIR_X             18
+#define E_DIR_Y             19
+
+#define TRG_CHANNEL         0
+#define TRG_INPUT_CH        1
+#define TRG_IS_HEAD         2
+#define TRG_IS_ACTIVE       3
+#define TRG_IS_OR           4
+#define TRG_IS_AND          5
+#define TRG_IS_XOR          6
+#define TRG_IS_NAND         7
+#define TRG_IS_NOT          8
+#define TRG_FORCE_ACTIVE    9
+#define TRG_FORCE_INACTIVE  10
+#define TRG_FORCE_INVERT    11
 
 typedef struct Tile {
     char* tileID;
 
-    int attr[14];           // tile's attributes
+    int attr[T_NUM_ATTR];           // tile's attributes
 } Tile;
 
 typedef struct Entity {
@@ -87,7 +101,7 @@ typedef struct Entity {
 
     bool existsInWorkspace;
 
-    int attr[20];
+    int attr[2 * E_NUM_ATTR];
 
     Texture2D* animFrames;
 

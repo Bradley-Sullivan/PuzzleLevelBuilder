@@ -90,6 +90,9 @@ void entityEdit(Workspace* w, Menu* editEntityContextMenu, bool newEntity) {
         entEditIndex = w->editingEntityIdx;
     }
 
+    editEntityContextMenu->menuVals[E_POS_X + 1] = TILE_PIX_HEIGHT * w->cursorCol;
+    editEntityContextMenu->menuVals[E_POS_Y + 1] = TILE_PIX_WIDTH * w->cursorRow;
+
     if (trVal == KEY_ENTER && editEntityContextMenu->cursor == editEntityContextMenu->numSel - 1) {
         w->editingEntity = false;
         for (int i = 1; i < E_NUM_ATTR; i++) {
@@ -108,12 +111,5 @@ void entityEdit(Workspace* w, Menu* editEntityContextMenu, bool newEntity) {
             editEntityContextMenu->menuVals[E_TEXTURE_IDX + 1] = 0;
         }
         previewTextures(w, editEntityContextMenu->menuVals[E_TEXTURE_IDX + 1], ENTITY_TEX);
-    } else if (editEntityContextMenu->cursor == E_ACTIVE_TEX_IDX + 1) {
-        if (editEntityContextMenu->menuVals[E_ACTIVE_TEX_IDX + 1] > w->numEntityTex - 1) {
-            editEntityContextMenu->menuVals[E_ACTIVE_TEX_IDX + 1] = w->numEntityTex - 1;
-        } else if (editEntityContextMenu->menuVals[E_ACTIVE_TEX_IDX + 1] < 0) {
-            editEntityContextMenu->menuVals[E_ACTIVE_TEX_IDX + 1] = 0;
-        }
-        previewTextures(w, editEntityContextMenu->menuVals[E_ACTIVE_TEX_IDX + 1], ENTITY_TEX);
     }
 }

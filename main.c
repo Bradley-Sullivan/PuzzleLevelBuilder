@@ -87,26 +87,26 @@ int main(void) {
     int levelConfMenuTypes[6] = {TEXT_ENTRY, PLUS_MINUS_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU, SIMPLE_MENU, SIMPLE_MENU};
     initMenu(&levelConfMenu, 6, SUB_MENU_FS, levelConfMenuSel, levelConfMenuTypes, false);
 
-    char editTileContextMenuSel[T_NUM_ATTR + 2][MAX_MENU_LEN] = {"TileID", "Player Coll.", "Entity Coll.", "Proj. Coll.", 
-                                                "Moveable", "Player Spawn", "Entity Spawn", "Level End", 
-                                                "Teleporter", "1-Way Tele.", "Tex. Index", "Row Pos.", 
-                                                "Col Pos.", "Entity Sp. Channel", "Tele Channel", "CONFIRM"};
-    int editTileContextMenuTypes[T_NUM_ATTR + 2] = {TEXT_ENTRY, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, 
-                                    CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, 
-                                    CHECKLIST_MENU, CHECKLIST_MENU, PLUS_MINUS_MENU, DISPLAY_VAL, 
-                                    DISPLAY_VAL, PLUS_MINUS_MENU, PLUS_MINUS_MENU, SIMPLE_MENU};
+    char editTileContextMenuSel[T_NUM_ATTR + 2][MAX_MENU_LEN] = {"TileID", "Tex. Index", "Player Coll.", "Entity Coll.",
+                                                                "Is Textured", "Level End", "Moveable", "Player Spawn",
+                                                                "Entity Spawn", "Is Teleporter", "One-Way Tele.", "Tele. Ch.",
+                                                                "E. Spawn Ch.", "Grid Row", "Grid Col.", "CONFIRM"};
+    int editTileContextMenuTypes[T_NUM_ATTR + 2] = {TEXT_ENTRY, PLUS_MINUS_MENU, CHECKLIST_MENU, CHECKLIST_MENU,
+                                                    CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU,
+                                                    CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, PLUS_MINUS_MENU,
+                                                    PLUS_MINUS_MENU, DISPLAY_VAL, DISPLAY_VAL, SIMPLE_MENU};
     initMenu(&editTileContextMenu, T_NUM_ATTR + 2, CONTEXT_MENU_FS, editTileContextMenuSel, editTileContextMenuTypes, true);
 
-    char editEntityContextMenuSel[E_NUM_ATTR + 2][MAX_MENU_LEN] = {"EntityID", "Hostile", "Passive", "Active", "Trigger Head",
-                                                    "Is Textured", "Player Coll.", "Entity Coll.", "Proj. Coll.",
-                                                    "Active Interact", "Passive Interact", "Effect Magnitude", "X Dir.",
-                                                    "Y Dir.", "Tex. Index", "Active Tex. Index", "Trigger Channel", 
-                                                    "X Position", "Y Position", "Move Speed", "Anim. Period", "CONFIRM"};
-    int editEntityContextMenuTypes[E_NUM_ATTR + 2] = {TEXT_ENTRY, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU,
-                                        CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU,
-                                        CHECKLIST_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU,
-                                        PLUS_MINUS_MENU, PLUS_MINUS_MENU, DISPLAY_VAL, DISPLAY_VAL, PLUS_MINUS_MENU,
-                                        PLUS_MINUS_MENU, SIMPLE_MENU};
+    char editEntityContextMenuSel[E_NUM_ATTR + 2][MAX_MENU_LEN] = { "EntityID", "Tex. Index", "Player Coll.", "Entity Coll.",
+                                                                    "Is Textured", "Is Mobile", "Is Animated", "Is Hostile",
+                                                                    "Is Passive", "Is Active", "Is Triggerable", "Render Layer",
+                                                                    "Effect Mag.", "Move Speed", "Anim. Period", "Trigger Ch.",
+                                                                    "Spawn Ch.", "X-Position", "Y-Position", "Move Dir. X", "Move Dir. Y" ,"CONFIRM"};
+    int editEntityContextMenuTypes[E_NUM_ATTR + 2] = {TEXT_ENTRY, PLUS_MINUS_MENU, CHECKLIST_MENU, CHECKLIST_MENU,
+                                                    CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU,
+                                                    CHECKLIST_MENU, CHECKLIST_MENU, CHECKLIST_MENU, PLUS_MINUS_MENU, 
+                                                    PLUS_MINUS_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU, PLUS_MINUS_MENU,
+                                                    PLUS_MINUS_MENU, DISPLAY_VAL, DISPLAY_VAL, PLUS_MINUS_MENU, PLUS_MINUS_MENU, SIMPLE_MENU};
     initMenu(&editEntityContextMenu, E_NUM_ATTR + 2, CONTEXT_MENU_FS, editEntityContextMenuSel, editEntityContextMenuTypes, true);
 
     char editSubMenuSel[5][MAX_MENU_LEN] = {"TOOLS", "SWITCH LEVEL", "ADD LEVEL", "SAVE", "QUIT"};
@@ -383,7 +383,7 @@ bool exportLevels(Workspace* w, char* filepath) {
                 for (int j = 0; j < w->levels[i].numCols; j++) {
                     char* printStr = (char*)malloc(sizeof(char) * (2 * T_NUM_ATTR * w->levels[i].numCols + MAX_TILE_ID_LEN));
                     char* tileAttr = (char*)malloc(sizeof(char) * 2 * T_NUM_ATTR);
-                    if (w->levels[i].tiles[j][k].tileID[0] == '\0') {
+                    if (w->levels[i].tiles[k][j].tileID[0] == '\0') {
                         strcpy(printStr, "unnamed,");
                     } else {
                         sprintf(printStr, "%s,", w->levels[i].tiles[k][j].tileID);
@@ -405,7 +405,7 @@ bool exportLevels(Workspace* w, char* filepath) {
                 char* printStr = (char*)malloc(sizeof(char) * (3 * E_NUM_ATTR + MAX_ENT_ID_LEN));
                 char* entityAttr = (char*)malloc(sizeof(char) * (2 * E_NUM_ATTR));
                 if (w->levels[i].ents[k].entityID[0] == '\0') {
-                    strcpy(printStr, ";unnamed,");
+                    strcpy(printStr, ";unnamed,");  // <<<< Double semi-colon perp
                 } else {
                     sprintf(printStr, ";%s,", w->levels[i].ents[k].entityID);
                 }                
@@ -646,8 +646,6 @@ BuildState editingLoop(Workspace* w, Menu* editTileContextMenu, Menu* editEntity
                     w->entityEditCollision = false;
                     w->editingNewEntity = true;
                     int editEntityIdx = w->levels[w->activeEditLevel].nextFreeEnt;
-                    w->levels[w->activeEditLevel].ents[editEntityIdx].attr[E_POS_X] = TILE_PIX_HEIGHT * w->cursorCol;
-                    w->levels[w->activeEditLevel].ents[editEntityIdx].attr[E_POS_Y] = TILE_PIX_WIDTH * w->cursorRow;
                     for (int i = 1; i < E_NUM_ATTR; i++) {
                         editEntityContextMenu->menuVals[i] = w->levels[w->activeEditLevel].ents[editEntityIdx].attr[i - 1];
                     }
